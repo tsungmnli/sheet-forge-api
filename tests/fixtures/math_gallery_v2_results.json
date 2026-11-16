@@ -1,0 +1,135 @@
+[
+ {
+  "id": "V01",
+  "latex": "3\\mathrm{km}+x",
+  "script": "3 rm km + x",
+  "verdict": "scope_issue",
+  "note": "rm이 뒤쪽 전체에 적용(x도 곧게)"
+ },
+ {
+  "id": "V02",
+  "latex": "3\\mathrm{km}+x",
+  "script": "3 {rm km} + x",
+  "verdict": "scope_issue",
+  "note": "{ }로 범위 제한 안 됨"
+ },
+ {
+  "id": "V03",
+  "latex": "3\\mathrm{km}+x",
+  "script": "3 rm km it + x",
+  "verdict": "ok",
+  "note": "rm km it로 되돌림 성공"
+ },
+ {
+  "id": "V04",
+  "latex": "3\\mathrm{km}+x",
+  "script": "3 rm {km} + x",
+  "verdict": "scope_issue",
+  "note": "rm {km}도 범위 제한 안 됨"
+ },
+ {
+  "id": "V05",
+  "latex": "x\\in\\mathbb{R}",
+  "script": "x in rm R",
+  "verdict": "ok",
+  "note": ""
+ },
+ {
+  "id": "V06",
+  "latex": "x\\in\\mathbb{R}",
+  "script": "x in {rm R}",
+  "verdict": "ok",
+  "note": ""
+ },
+ {
+  "id": "V07",
+  "latex": "xin",
+  "script": "x i n",
+  "verdict": "ok",
+  "note": ""
+ },
+ {
+  "id": "V08",
+  "latex": "api",
+  "script": "a p i",
+  "verdict": "ok",
+  "note": ""
+ },
+ {
+  "id": "V09",
+  "latex": "\\sin x",
+  "script": "sin`x",
+  "verdict": "ok",
+  "note": ""
+ },
+ {
+  "id": "V10",
+  "latex": "\\log_2 8",
+  "script": "log _{2} `8",
+  "verdict": "ok",
+  "note": ""
+ },
+ {
+  "id": "V11",
+  "latex": "{}_nP_r",
+  "script": "{} _{n} P _{r}",
+  "verdict": "ok",
+  "note": ""
+ },
+ {
+  "id": "V12",
+  "latex": "n!",
+  "script": "n!",
+  "verdict": "ok",
+  "note": ""
+ },
+ {
+  "id": "V13",
+  "latex": "10\\%",
+  "script": "10%",
+  "verdict": "ok",
+  "note": ""
+ },
+ {
+  "id": "V14",
+  "latex": "A^{c}",
+  "script": "A ^{c}",
+  "verdict": "ok",
+  "note": ""
+ },
+ {
+  "id": "V15",
+  "latex": "\\left|\\frac{a}{b}\\right|",
+  "script": "LEFT | {a} over {b} RIGHT |",
+  "verdict": "ok",
+  "note": ""
+ },
+ {
+  "id": "V16",
+  "latex": "|\\frac{a}{b}|",
+  "script": "|{a} over {b}|",
+  "verdict": "ok",
+  "note": ""
+ },
+ {
+  "id": "V17",
+  "latex": "\\{1,2,3\\}",
+  "script": "lbrace 1,`2,`3 rbrace",
+  "verdict": "ok",
+  "note": ""
+ },
+ {
+  "id": "V18",
+  "latex": "\\sin^2 x",
+  "script": "sin ^{2} `x",
+  "verdict": "ok",
+  "note": ""
+ },
+ {
+  "id": "V19",
+  "latex": "\\min(a,b)",
+  "script": "min(a,`b)",
+  "verdict": "ok",
+  "note": ""
+ }
+]

@@ -1,0 +1,14 @@
+# 런타임 의존성 (pyproject.toml의 [project].dependencies와 같게 유지)
+lxml>=5.2
+fastapi>=0.110
+uvicorn>=0.29
+sqlalchemy>=2.0
+psycopg[binary]>=3.2
+alembic>=1.13
+python-dotenv>=1.0
+minio>=7.2
+python-multipart>=0.0.9
+pillow>=10.1
+numpy>=1.26
+opencv-python-headless>=4.9
+pillow-heif>=0.16

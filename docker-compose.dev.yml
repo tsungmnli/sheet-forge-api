@@ -1,0 +1,40 @@
+# 로컬 개발 전용(운영에는 쓰지 않는다).
+#   docker compose -f docker-compose.dev.yml up -d                     # Postgres
+#   docker compose -f docker-compose.dev.yml --profile storage up -d   # + 로컬 MinIO
+#   docker compose -f docker-compose.dev.yml down                      # 중지(데이터 유지)
+#   docker compose -f docker-compose.dev.yml down -v                   # 중지 + 데이터 삭제
+services:
+  postgres:
+    image: postgres:16
+    container_name: sf-pg
+    environment:
+      POSTGRES_PASSWORD: dev
+      POSTGRES_DB: sheet_forge
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - sf-pg-data:/var/lib/postgresql/data
+      - ./docker/initdb:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d sheet_forge"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  minio:
+    profiles: ["storage"]
+    image: quay.io/minio/minio
+    container_name: sf-minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: devadmin
+      MINIO_ROOT_PASSWORD: devadmin-secret
+    ports:
+      - "127.0.0.1:9000:9000"
+      - "127.0.0.1:9001:9001"
+    volumes:
+      - sf-minio-data:/data
+
+volumes:
+  sf-pg-data:
+  sf-minio-data:

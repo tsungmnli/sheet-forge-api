@@ -1,0 +1,1046 @@
+[
+ {
+  "id": "C01",
+  "latex": "\\frac{3x+1}{x+1}",
+  "script": "{3x+1} over {x+1}",
+  "verdict": "ok",
+  "note": "",
+  "hangul_w": 3255,
+  "hangul_h": 2250
+ },
+ {
+  "id": "C02",
+  "latex": "x^2+y^2+6x-20y+1=0",
+  "script": "x ^{2} +y ^{2} +6x-20y+1=0",
+  "verdict": "ok",
+  "note": "",
+  "hangul_w": 11410,
+  "hangul_h": 1163
+ },
+ {
+  "id": "C03",
+  "latex": "(h \\circ g)(x)=x^2-7",
+  "script": "(h CIRC  g)(x)=x ^{2} -7",
+  "verdict": "ok",
+  "note": "",
+  "hangul_w": 8455,
+  "hangul_h": 1163
+ },
+ {
+  "id": "C04",
+  "latex": "f^{-1}(4)=0",
+  "script": "f ^{-1} (4)=0",
+  "verdict": "ok",
+  "note": "",
+  "hangul_w": 4888,
+  "hangul_h": 1163
+ },
+ {
+  "id": "C05",
+  "latex": "\\sqrt{2x+a}",
+  "script": "sqrt {2x+a}",
+  "verdict": "ok",
+  "note": "",
+  "hangul_w": 3600,
+  "hangul_h": 1123
+ },
+ {
+  "id": "S01",
+  "latex": "(-4,1)",
+  "script": "(-4,1)",
+  "verdict": "ok",
+  "note": "",
+  "hangul_w": 3205,
+  "hangul_h": 975
+ },
+ {
+  "id": "S02",
+  "latex": "(-4,1)",
+  "script": "(-4,`1)",
+  "verdict": "ok",
+  "note": "",
+  "hangul_w": 3330,
+  "hangul_h": 1000
+ },
+ {
+  "id": "S03",
+  "latex": "(-4, 1)",
+  "script": "(-4, 1)",
+  "verdict": "ok",
+  "note": "",
+  "hangul_w": 3205,
+  "hangul_h": 975
+ },
+ {
+  "id": "S04",
+  "latex": "(-4,1)",
+  "script": "(-4,~1)",
+  "verdict": "ok",
+  "note": "",
+  "hangul_w": 3705,
+  "hangul_h": 1000
+ },
+ {
+  "id": "S05",
+  "latex": "A(1,2),B(4,-1)",
+  "script": "A(1,2),B(4,-1)",
+  "verdict": "ok",
+  "note": "",
+  "hangul_w": 7460,
+  "hangul_h": 975
+ },
+ {
+  "id": "S06",
+  "latex": "A(1,2),B(4,-1)",
+  "script": "A(1,``2),``B(4,`-1)",
+  "verdict": "ok",
+  "note": "",
+  "hangul_w": 8295,
+  "hangul_h": 1000
+ },
+ {
+  "id": "O01a",
+  "latex": "x \\le 3",
+  "script": "x <= 3",
+  "verdict": "ok",
+  "note": "",
+  "hangul_w": 2595,
+  "hangul_h": 975
+ },
+ {
+  "id": "O01b",
+  "latex": "x \\le 3",
+  "script": "x LEQ 3",
+  "verdict": "ok",
+  "note": "",
+  "hangul_w": 2595,
+  "hangul_h": 975
+ },
+ {
+  "id": "O01c",
+  "latex": "x \\le 3",
+  "script": "x le 3",
+  "verdict": "ok",
+  "note": "",
+  "hangul_w": 2595,
+  "hangul_h": 975
+ },
+ {
+  "id": "O02a",
+  "latex": "x \\ge 3",
+  "script": "x >= 3",
+  "verdict": "ok",
+  "note": "",
+  "hangul_w": 2595,
+  "hangul_h": 975
+ },
+ {
+  "id": "O02b",
+  "latex": "x \\ge 3",
+  "script": "x GEQ 3",
+  "verdict": "ok",
+  "note": "",
+  "hangul_w": 2595,
+  "hangul_h": 975
+ },
+ {
+  "id": "O02c",
+  "latex": "x \\ge 3",
+  "script": "x ge 3",
+  "verdict": "ok",
+  "note": "",
+  "hangul_w": 2595,
+  "hangul_h": 975
+ },
+ {
+  "id": "O03a",
+  "latex": "x \\ne 3",
+  "script": "x != 3",
+  "verdict": "ok",
+  "note": "",
+  "hangul_w": 2455,
+  "hangul_h": 975
+ },
+ {
+  "id": "O03b",
+  "latex": "x \\ne 3",
+  "script": "x NEQ 3",
+  "verdict": "ok",
+  "note": "",
+  "hangul_w": 2455,
+  "hangul_h": 975
+ },
+ {
+  "id": "O03c",
+  "latex": "x \\ne 3",
+  "script": "x ne 3",
+  "verdict": "ok",
+  "note": "",
+  "hangul_w": 2455,
+  "hangul_h": 975
+ },
+ {
+  "id": "O04a",
+  "latex": "x<3",
+  "script": "x < 3",
+  "verdict": "ok",
+  "note": "",
+  "hangul_w": 2445,
+  "hangul_h": 975
+ },
+ {
+  "id": "O04b",
+  "latex": "x>3",
+  "script": "x > 3",
+  "verdict": "ok",
+  "note": "",
+  "hangul_w": 2445,
+  "hangul_h": 975
+ },
+ {
+  "id": "O05a",
+  "latex": "a \\pm b",
+  "script": "a +- b",
+  "verdict": "ok",
+  "note": "",
+  "hangul_w": 2080,
+  "hangul_h": 975
+ },
+ {
+  "id": "O05b",
+  "latex": "a \\pm b",
+  "script": "a PLUSMINUS b",
+  "verdict": "ok",
+  "note": "",
+  "hangul_w": 2080,
+  "hangul_h": 975
+ },
+ {
+  "id": "O05c",
+  "latex": "a \\pm b",
+  "script": "a pm b",
+  "verdict": "invalid",
+  "note": "invalid: 이탤릭 글자 pm으로 렌더링",
+  "hangul_w": 2325,
+  "hangul_h": 975
+ },
+ {
+  "id": "O06a",
+  "latex": "a \\times b",
+  "script": "a times b",
+  "verdict": "ok",
+  "note": "",
+  "hangul_w": 2080,
+  "hangul_h": 975
+ },
+ {
+  "id": "O06b",
+  "latex": "a \\times b",
+  "script": "a TIMES b",
+  "verdict": "ok",
+  "note": "",
+  "hangul_w": 2080,
+  "hangul_h": 975
+ },
+ {
+  "id": "O07a",
+  "latex": "a \\div b",
+  "script": "a div b",
+  "verdict": "ok",
+  "note": "",
+  "hangul_w": 2080,
+  "hangul_h": 975
+ },
+ {
+  "id": "O07b",
+  "latex": "a \\div b",
+  "script": "a DIVIDE b",
+  "verdict": "ok",
+  "note": "",
+  "hangul_w": 2080,
+  "hangul_h": 975
+ },
+ {
+  "id": "O08a",
+  "latex": "a \\cdot b",
+  "script": "a cdot b",
+  "verdict": "ok",
+  "note": "",
+  "hangul_w": 2025,
+  "hangul_h": 975
+ },
+ {
+  "id": "O08b",
+  "latex": "a \\cdot b",
+  "script": "a CDOT b",
+  "verdict": "ok",
+  "note": "",
+  "hangul_w": 2025,
+  "hangul_h": 975
+ },
+ {
+  "id": "O09a",
+  "latex": "|x-1|",
+  "script": "LEFT | x-1 RIGHT |",
+  "verdict": "ok",
+  "note": "",
+  "hangul_w": 3280,
+  "hangul_h": 975
+ },
+ {
+  "id": "O09b",
+  "latex": "|x-1|",
+  "script": "|x-1|",
+  "verdict": "ok",
+  "note": "",
+  "hangul_w": 2680,
+  "hangul_h": 975
+ },
+ {
+  "id": "O10a",
+  "latex": "a_n",
+  "script": "a _{n}",
+  "verdict": "ok",
+  "note": "",
+  "hangul_w": 975,
+  "hangul_h": 1177
+ },
+ {
+  "id": "O10b",
+  "latex": "a_{n+1}",
+  "script": "a _{n+1}",
+  "verdict": "ok",
+  "note": "",
+  "hangul_w": 2146,
+  "hangul_h": 1177
+ },
+ {
+  "id": "O11a",
+  "latex": "\\infty",
+  "script": "inf",
+  "verdict": "ok",
+  "note": "",
+  "hangul_w": 1050,
+  "hangul_h": 975
+ },
+ {
+  "id": "O11b",
+  "latex": "\\infty",
+  "script": "INF",
+  "verdict": "ok",
+  "note": "",
+  "hangul_w": 1050,
+  "hangul_h": 975
+ },
+ {
+  "id": "O12a",
+  "latex": "x \\to 3",
+  "script": "x -> 3",
+  "verdict": "ok",
+  "note": "",
+  "hangul_w": 2175,
+  "hangul_h": 975
+ },
+ {
+  "id": "O12b",
+  "latex": "x \\to 3",
+  "script": "x RARROW 3",
+  "verdict": "ok",
+  "note": "valid, 의미 다름: ⇒ (이중 화살표)",
+  "hangul_w": 2175,
+  "hangul_h": 975
+ },
+ {
+  "id": "O12c",
+  "latex": "x \\to 3",
+  "script": "x rarrow 3",
+  "verdict": "ok",
+  "note": "",
+  "hangul_w": 2175,
+  "hangul_h": 975
+ },
+ {
+  "id": "O13a",
+  "latex": "\\therefore",
+  "script": "therefore",
+  "verdict": "ok",
+  "note": "",
+  "hangul_w": 1050,
+  "hangul_h": 975
+ },
+ {
+  "id": "O13b",
+  "latex": "\\therefore",
+  "script": "THEREFORE",
+  "verdict": "ok",
+  "note": "",
+  "hangul_w": 1050,
+  "hangul_h": 975
+ },
+ {
+  "id": "E01a",
+  "latex": "x \\in A",
+  "script": "x in A",
+  "verdict": "ok",
+  "note": "",
+  "hangul_w": 2475,
+  "hangul_h": 975
+ },
+ {
+  "id": "E01b",
+  "latex": "x \\in A",
+  "script": "x IN A",
+  "verdict": "ok",
+  "note": "",
+  "hangul_w": 2475,
+  "hangul_h": 975
+ },
+ {
+  "id": "E02a",
+  "latex": "x \\notin A",
+  "script": "x notin A",
+  "verdict": "ok",
+  "note": "",
+  "hangul_w": 2755,
+  "hangul_h": 975
+ },
+ {
+  "id": "E02b",
+  "latex": "x \\notin A",
+  "script": "x NOTIN A",
+  "verdict": "ok",
+  "note": "",
+  "hangul_w": 2755,
+  "hangul_h": 975
+ },
+ {
+  "id": "E03a",
+  "latex": "A \\subset B",
+  "script": "A subset B",
+  "verdict": "ok",
+  "note": "",
+  "hangul_w": 3045,
+  "hangul_h": 975
+ },
+ {
+  "id": "E03b",
+  "latex": "A \\subset B",
+  "script": "A SUBSET B",
+  "verdict": "ok",
+  "note": "",
+  "hangul_w": 3045,
+  "hangul_h": 975
+ },
+ {
+  "id": "E04a",
+  "latex": "A \\cup B",
+  "script": "A cup B",
+  "verdict": "ok",
+  "note": "",
+  "hangul_w": 2625,
+  "hangul_h": 975
+ },
+ {
+  "id": "E04b",
+  "latex": "A \\cup B",
+  "script": "A CUP B",
+  "verdict": "ok",
+  "note": "",
+  "hangul_w": 2625,
+  "hangul_h": 975
+ },
+ {
+  "id": "E05a",
+  "latex": "A \\cap B",
+  "script": "A cap B",
+  "verdict": "ok",
+  "note": "",
+  "hangul_w": 2625,
+  "hangul_h": 975
+ },
+ {
+  "id": "E05b",
+  "latex": "A \\cap B",
+  "script": "A CAP B",
+  "verdict": "ok",
+  "note": "",
+  "hangul_w": 2625,
+  "hangul_h": 975
+ },
+ {
+  "id": "E06a",
+  "latex": "\\emptyset",
+  "script": "emptyset",
+  "verdict": "ok",
+  "note": "",
+  "hangul_w": 1050,
+  "hangul_h": 975
+ },
+ {
+  "id": "E06b",
+  "latex": "\\emptyset",
+  "script": "EMPTYSET",
+  "verdict": "ok",
+  "note": "",
+  "hangul_w": 1050,
+  "hangul_h": 975
+ },
+ {
+  "id": "E07a",
+  "latex": "\\{1,2,3\\}",
+  "script": "lbrace 1,2,3 rbrace",
+  "verdict": "ok",
+  "note": "",
+  "hangul_w": 3585,
+  "hangul_h": 975
+ },
+ {
+  "id": "E07b",
+  "latex": "\\{1,2,3\\}",
+  "script": "LEFT lbrace 1,2,3 RIGHT rbrace",
+  "verdict": "ok",
+  "note": "",
+  "hangul_w": 3515,
+  "hangul_h": 975
+ },
+ {
+  "id": "E07c",
+  "latex": "\\{1,2,3\\}",
+  "script": "\\{1,2,3\\}",
+  "verdict": "invalid",
+  "note": "invalid: 역슬래시가 글자로 보임",
+  "hangul_w": 3440,
+  "hangul_h": 1000
+ },
+ {
+  "id": "E07d",
+  "latex": "\\{1,2,3\\}",
+  "script": "LEFT { 1,2,3 RIGHT }",
+  "verdict": "ok",
+  "note": "",
+  "hangul_w": 3365,
+  "hangul_h": 975
+ },
+ {
+  "id": "G01a",
+  "latex": "\\overline{AB}",
+  "script": "bar {AB}",
+  "verdict": "ok",
+  "note": "",
+  "hangul_w": 1680,
+  "hangul_h": 1170
+ },
+ {
+  "id": "G01b",
+  "latex": "\\overline{AB}",
+  "script": "overline {AB}",
+  "verdict": "ok",
+  "note": "",
+  "hangul_w": 1680,
+  "hangul_h": 1170
+ },
+ {
+  "id": "G01c",
+  "latex": "\\overline{AB}",
+  "script": "OVERLINE {AB}",
+  "verdict": "ok",
+  "note": "",
+  "hangul_w": 1680,
+  "hangul_h": 1170
+ },
+ {
+  "id": "G02a",
+  "latex": "\\angle ABC",
+  "script": "angle ABC",
+  "verdict": "ok",
+  "note": "",
+  "hangul_w": 3300,
+  "hangul_h": 975
+ },
+ {
+  "id": "G02b",
+  "latex": "\\angle ABC",
+  "script": "ANGLE ABC",
+  "verdict": "ok",
+  "note": "",
+  "hangul_w": 3300,
+  "hangul_h": 975
+ },
+ {
+  "id": "G03a",
+  "latex": "\\triangle ABC",
+  "script": "triangle ABC",
+  "verdict": "ok",
+  "note": "",
+  "hangul_w": 3300,
+  "hangul_h": 975
+ },
+ {
+  "id": "G03b",
+  "latex": "\\triangle ABC",
+  "script": "TRIANGLE ABC",
+  "verdict": "ok",
+  "note": "",
+  "hangul_w": 3300,
+  "hangul_h": 975
+ },
+ {
+  "id": "G04a",
+  "latex": "30^\\circ",
+  "script": "30 DEG",
+  "verdict": "ok",
+  "note": "valid, 도 기호 앞에 간격",
+  "hangul_w": 1875,
+  "hangul_h": 975
+ },
+ {
+  "id": "G04b",
+  "latex": "30^\\circ",
+  "script": "30°",
+  "verdict": "ok",
+  "note": "valid, 간격 없음(채택)",
+  "hangul_w": 1500,
+  "hangul_h": 975
+ },
+ {
+  "id": "G04c",
+  "latex": "30^\\circ",
+  "script": "30 ^{ circ }",
+  "verdict": "ok",
+  "note": "valid, 위첨자 형태·줄 높이 증가",
+  "hangul_w": 1800,
+  "hangul_h": 1163
+ },
+ {
+  "id": "G04d",
+  "latex": "30^\\circ",
+  "script": "30 ^{CIRC}",
+  "verdict": "ok",
+  "note": "valid, 위첨자 형태·줄 높이 증가",
+  "hangul_w": 1800,
+  "hangul_h": 1163
+ },
+ {
+  "id": "F01a",
+  "latex": "\\begin{cases}x+y=1\\\\x-y=3\\end{cases}",
+  "script": "cases{x+y=1 # x-y=3}",
+  "verdict": "ok",
+  "note": "",
+  "hangul_w": 4525,
+  "hangul_h": 2100
+ },
+ {
+  "id": "F01b",
+  "latex": "\\begin{cases}x+y=1\\\\x-y=3\\end{cases}",
+  "script": "CASES{x+y=1 # x-y=3}",
+  "verdict": "ok",
+  "note": "",
+  "hangul_w": 4525,
+  "hangul_h": 2100
+ },
+ {
+  "id": "F02a",
+  "latex": "\\sqrt[3]{x}",
+  "script": "root 3 of {x}",
+  "verdict": "ok",
+  "note": "",
+  "hangul_w": 1445,
+  "hangul_h": 1123
+ },
+ {
+  "id": "F02b",
+  "latex": "\\sqrt[3]{x}",
+  "script": "root {3} of {x}",
+  "verdict": "ok",
+  "note": "",
+  "hangul_w": 1445,
+  "hangul_h": 1123
+ },
+ {
+  "id": "F02c",
+  "latex": "\\sqrt[3]{x}",
+  "script": "ROOT 3 OF {x}",
+  "verdict": "ok",
+  "note": "",
+  "hangul_w": 1445,
+  "hangul_h": 1123
+ },
+ {
+  "id": "F03",
+  "latex": "x^{\\frac{1}{2}}",
+  "script": "x ^{ {1} over {2} }",
+  "verdict": "ok",
+  "note": "",
+  "hangul_w": 1315,
+  "hangul_h": 2042
+ },
+ {
+  "id": "F04a",
+  "latex": "{}_nC_r",
+  "script": "_{n} C _{r}",
+  "verdict": "invalid",
+  "note": "invalid: 빈 수식(앞에 {} 필요)",
+  "hangul_w": 500,
+  "hangul_h": 1000
+ },
+ {
+  "id": "F04b",
+  "latex": "{}_nC_r",
+  "script": "{} _{n} C _{r}",
+  "verdict": "ok",
+  "note": "",
+  "hangul_w": 1500,
+  "hangul_h": 1177
+ },
+ {
+  "id": "F04c",
+  "latex": "{}_nC_r",
+  "script": "_{n} rm C _{r}",
+  "verdict": "invalid",
+  "note": "invalid: 빈 수식",
+  "hangul_w": 500,
+  "hangul_h": 1000
+ },
+ {
+  "id": "F05a",
+  "latex": "\\left(\\frac{a}{b}\\right)",
+  "script": "LEFT ( {a} over {b} RIGHT )",
+  "verdict": "ok",
+  "note": "",
+  "hangul_w": 1775,
+  "hangul_h": 2250
+ },
+ {
+  "id": "F05b",
+  "latex": "(\\frac{a}{b})",
+  "script": "( {a} over {b} )",
+  "verdict": "ok",
+  "note": "",
+  "hangul_w": 1775,
+  "hangul_h": 2250
+ },
+ {
+  "id": "F05c",
+  "latex": "\\left[\\frac{a}{b}\\right]",
+  "script": "LEFT [ {a} over {b} RIGHT ]",
+  "verdict": "ok",
+  "note": "",
+  "hangul_w": 2075,
+  "hangul_h": 2250
+ },
+ {
+  "id": "F06",
+  "latex": "f(x)=\\left(\\frac{x+1}{x-1}\\right)^2",
+  "script": "f(x)= LEFT ( {x+1} over {x-1} RIGHT ) ^{2}",
+  "verdict": "ok",
+  "note": "",
+  "hangul_w": 7190,
+  "hangul_h": 2417
+ },
+ {
+  "id": "F07",
+  "latex": "\\frac{1}{\\frac{1}{x}+1}",
+  "script": "{1} over { {1} over {x} +1 }",
+  "verdict": "ok",
+  "note": "",
+  "hangul_w": 3090,
+  "hangul_h": 3525
+ },
+ {
+  "id": "F08",
+  "latex": "\\frac{1}{\\sqrt{2}}",
+  "script": "{1} over {sqrt {2}}",
+  "verdict": "ok",
+  "note": "",
+  "hangul_w": 1870,
+  "hangul_h": 2398
+ },
+ {
+  "id": "F09",
+  "latex": "\\sqrt{x^2+1}",
+  "script": "sqrt {x ^{2} +1}",
+  "verdict": "ok",
+  "note": "",
+  "hangul_w": 3510,
+  "hangul_h": 1308
+ },
+ {
+  "id": "F10",
+  "latex": "a^{n+1}",
+  "script": "a ^{n+1}",
+  "verdict": "ok",
+  "note": "",
+  "hangul_w": 2146,
+  "hangul_h": 1163
+ },
+ {
+  "id": "F11",
+  "latex": "x_1^2",
+  "script": "x _{1} ^{2}",
+  "verdict": "ok",
+  "note": "",
+  "hangul_w": 975,
+  "hangul_h": 1365
+ },
+ {
+  "id": "T01a",
+  "latex": "3\\mathrm{km}",
+  "script": "3km",
+  "verdict": "ok",
+  "note": "valid, 단위가 기울임",
+  "hangul_w": 1875,
+  "hangul_h": 975
+ },
+ {
+  "id": "T01b",
+  "latex": "3\\mathrm{km}",
+  "script": "3 rm km",
+  "verdict": "ok",
+  "note": "",
+  "hangul_w": 2025,
+  "hangul_h": 1000
+ },
+ {
+  "id": "T01c",
+  "latex": "3\\mathrm{km}",
+  "script": "3 \"km\"",
+  "verdict": "ok",
+  "note": "valid, 따옴표는 기울임 유지",
+  "hangul_w": 1875,
+  "hangul_h": 975
+ },
+ {
+  "id": "T02a",
+  "latex": "x=3\\text{이면}",
+  "script": "x=3 \"이면\"",
+  "verdict": "ok",
+  "note": "valid, 한글이 작게 렌더링",
+  "hangul_w": 3420,
+  "hangul_h": 1200
+ },
+ {
+  "id": "T02b",
+  "latex": "x=3\\text{이면}",
+  "script": "x=3 이면",
+  "verdict": "ok",
+  "note": "valid, 한글이 작게 렌더링",
+  "hangul_w": 3420,
+  "hangul_h": 1200
+ },
+ {
+  "id": "T03a",
+  "latex": "ab",
+  "script": "ab",
+  "verdict": "ok",
+  "note": "",
+  "hangul_w": 975,
+  "hangul_h": 975
+ },
+ {
+  "id": "T03b",
+  "latex": "abc",
+  "script": "abc",
+  "verdict": "ok",
+  "note": "",
+  "hangul_w": 1425,
+  "hangul_h": 975
+ },
+ {
+  "id": "T03c",
+  "latex": "min",
+  "script": "min",
+  "verdict": "ok",
+  "note": "valid, min은 함수명(곧은 글자)",
+  "hangul_w": 1800,
+  "hangul_h": 975
+ },
+ {
+  "id": "T03d",
+  "latex": "xin",
+  "script": "xin",
+  "verdict": "conflict",
+  "note": "충돌: xi가 그리스 문자 ξ로 해석됨",
+  "hangul_w": 1125,
+  "hangul_h": 975
+ },
+ {
+  "id": "T04a",
+  "latex": "\\theta",
+  "script": "theta",
+  "verdict": "ok",
+  "note": "",
+  "hangul_w": 525,
+  "hangul_h": 975
+ },
+ {
+  "id": "T04b",
+  "latex": "\\pi",
+  "script": "pi",
+  "verdict": "ok",
+  "note": "",
+  "hangul_w": 600,
+  "hangul_h": 975
+ },
+ {
+  "id": "T04c",
+  "latex": "\\alpha \\beta",
+  "script": "alpha beta",
+  "verdict": "ok",
+  "note": "",
+  "hangul_w": 1200,
+  "hangul_h": 975
+ },
+ {
+  "id": "H01a",
+  "latex": "\\sin x",
+  "script": "sin x",
+  "verdict": "ok",
+  "note": "",
+  "hangul_w": 1950,
+  "hangul_h": 975
+ },
+ {
+  "id": "H01b",
+  "latex": "\\sin x",
+  "script": "rm sin x",
+  "verdict": "ok",
+  "note": "rm 범위가 뒤쪽 전체(x도 곧게)",
+  "hangul_w": 2025,
+  "hangul_h": 1000
+ },
+ {
+  "id": "H02",
+  "latex": "\\sin^2\\theta+\\cos^2\\theta=1",
+  "script": "sin ^{2} theta +cos ^{2} theta =1",
+  "verdict": "ok",
+  "note": "",
+  "hangul_w": 7525,
+  "hangul_h": 1163
+ },
+ {
+  "id": "H03",
+  "latex": "\\tan\\frac{\\pi}{4}",
+  "script": "tan {pi} over {4}",
+  "verdict": "ok",
+  "note": "",
+  "hangul_w": 2600,
+  "hangul_h": 2250
+ },
+ {
+  "id": "H04a",
+  "latex": "\\log_2 8",
+  "script": "log _{2} 8",
+  "verdict": "ok",
+  "note": "",
+  "hangul_w": 2325,
+  "hangul_h": 1177
+ },
+ {
+  "id": "H04b",
+  "latex": "\\log_2 8",
+  "script": "LOG _{2} 8",
+  "verdict": "invalid",
+  "note": "invalid: 대문자 LOG는 함수로 인식 안 됨",
+  "hangul_w": 3075,
+  "hangul_h": 1177
+ },
+ {
+  "id": "H05a",
+  "latex": "\\ln x",
+  "script": "ln x",
+  "verdict": "ok",
+  "note": "",
+  "hangul_w": 1500,
+  "hangul_h": 975
+ },
+ {
+  "id": "H05b",
+  "latex": "\\ln x",
+  "script": "LN x",
+  "verdict": "invalid",
+  "note": "invalid: 대문자 LN",
+  "hangul_w": 2100,
+  "hangul_h": 975
+ },
+ {
+  "id": "H06a",
+  "latex": "\\lim_{x\\to0}\\frac{\\sin x}{x}",
+  "script": "lim _{x -> 0} {sin x} over {x}",
+  "verdict": "ok",
+  "note": "",
+  "hangul_w": 4250,
+  "hangul_h": 2400
+ },
+ {
+  "id": "H06b",
+  "latex": "\\lim_{x\\to0}\\frac{\\sin x}{x}",
+  "script": "LIM _{x -> 0} {sin x} over {x}",
+  "verdict": "invalid",
+  "note": "invalid: 대문자 LIM",
+  "hangul_w": 6050,
+  "hangul_h": 2250
+ },
+ {
+  "id": "H06c",
+  "latex": "\\lim_{x\\to0}\\frac{\\sin x}{x}",
+  "script": "lim _{x rarrow 0} {sin x} over {x}",
+  "verdict": "ok",
+  "note": "",
+  "hangul_w": 4250,
+  "hangul_h": 2400
+ },
+ {
+  "id": "H07a",
+  "latex": "\\lim_{n\\to\\infty}a_n",
+  "script": "lim _{n -> inf} a _{n}",
+  "verdict": "ok",
+  "note": "",
+  "hangul_w": 2925,
+  "hangul_h": 1875
+ },
+ {
+  "id": "H07b",
+  "latex": "\\lim_{n\\to\\infty}a_n",
+  "script": "LIM _{n -> INF} a _{n}",
+  "verdict": "invalid",
+  "note": "invalid: 대문자 LIM",
+  "hangul_w": 4950,
+  "hangul_h": 1177
+ },
+ {
+  "id": "H08a",
+  "latex": "\\sum_{k=1}^{n}k",
+  "script": "sum _{k=1} ^{n} k",
+  "verdict": "ok",
+  "note": "",
+  "hangul_w": 2155,
+  "hangul_h": 2700
+ },
+ {
+  "id": "H08b",
+  "latex": "\\sum_{k=1}^{n}k",
+  "script": "SUM _{k=1} ^{n} k",
+  "verdict": "ok",
+  "note": "",
+  "hangul_w": 2155,
+  "hangul_h": 2700
+ },
+ {
+  "id": "H09a",
+  "latex": "\\int_0^1 x^2dx",
+  "script": "int _{0} ^{1} x ^{2} dx",
+  "verdict": "ok",
+  "note": "",
+  "hangul_w": 3660,
+  "hangul_h": 2586
+ },
+ {
+  "id": "H09b",
+  "latex": "\\int_0^1 x^2dx",
+  "script": "INT _{0} ^{1} x ^{2} dx",
+  "verdict": "ok",
+  "note": "",
+  "hangul_w": 3660,
+  "hangul_h": 2586
+ }
+]

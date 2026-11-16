@@ -1,0 +1,44 @@
+[project]
+name = "sheet-forge-api"
+version = "0.1.0"
+description = "시험지 문항 → hwpx 내보내기 API (hwpx 생성 모듈 + LaTeX→한글 수식 변환기)"
+requires-python = ">=3.10"
+dependencies = [
+    "lxml>=5.2",
+    "fastapi>=0.110",
+    "uvicorn>=0.29",
+    "sqlalchemy>=2.0",
+    "psycopg[binary]>=3.2",
+    "alembic>=1.13",
+    "python-dotenv>=1.0",
+    "minio>=7.2",
+    "python-multipart>=0.0.9",
+    "pillow>=10.1",
+    "numpy>=1.26",
+    "opencv-python-headless>=4.9",
+    "pillow-heif>=0.16",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+    "pytest-timeout>=2.3",
+    "httpx2>=2.0; python_version >= '3.11'",
+    "httpx>=0.27; python_version < '3.11'",
+]
+# scripts/fit_math_width.py (수식 폭 추정 재피팅)에만 필요
+fit = [
+    "numpy>=1.26",
+    "scipy>=1.11",
+]
+
+[tool.uv]
+package = false                 # 설치할 패키지가 아니라 애플리케이션이므로 빌드하지 않는다
+default-groups = ["dev"]        # uv sync 기본: 런타임 + dev. fit은 --group fit 으로 추가
+link-mode = "copy"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]              # `pytest`만 쳐도 app 패키지를 import할 수 있게
+addopts = "-q -x --tb=short"    # 짧은 출력, 첫 실패에서 멈춤(전부 보려면 `pytest --maxfail=999`)
+timeout = 30                    # 한 테스트가 30초를 넘기면 멈춘 것으로 보고 실패 처리(DB 연결 멈춤 방지)

@@ -1,0 +1,17 @@
+.git
+.gitignore
+.env
+.venv
+**/__pycache__
+*.pyc
+.pytest_cache
+tests
+scripts
+smoke
+docs
+deploy
+uv.lock
+pyproject.toml
+requirements-dev.txt
+*.hwpx
+!assets/templates/blank.hwpx
