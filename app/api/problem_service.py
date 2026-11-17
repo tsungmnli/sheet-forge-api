@@ -3,7 +3,7 @@
 상태를 바꾸는 함수는 행을 FOR UPDATE로 잠근 채 version·status를 확인하고 바꾼다(작업자·다른 탭과 겹쳐도 안전).
 """
 import copy
-from datetime import timedelta, timezone
+from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import and_, select
 from sqlalchemy import func, text
@@ -14,12 +14,14 @@ from ..db.models import Page, Problem, ReadUsage, Segment
 from ..jobs import enqueue
 from .edit_stats import count_edits
 from .errors import ApiError
+from .figure_erase import prepare_erased
 from .messages import friendly
-from .problem_logic import (MAX_FIGURES, analyze, empty_content, normalize_content, preview, search_text)
+from .problem_logic import (MAX_FIGURES, analyze, empty_content, normalize_content, preview, preview_tex, search_text)
 from .repo import alive, soft_delete
 from .segment_service import check_bbox, has_problem
 from .serialize import POLL_MS, image_url
 from .web_service import _require_exam, touch_exam
+from ..storage.images import StorageError
 
 EDITABLE = ("needs_review", "failed")
 
@@ -62,6 +64,7 @@ def problem_view(session, p: Problem) -> dict:
                        "crop_url": image_url(p.crop_ref)},
             "content": p.content, "points": p.points, "ocr": {"has_recognized": p.recognized is not None},
             "hints": hints,
+            "removed_figures": (p.ocr_meta or {}).get("removed_figures") or [],
             "checks": {"can_confirm": p.status in EDITABLE and not blockers, "blockers": blockers},
             "poll_after_ms": POLL_MS if p.status == "recognizing" else None}
 
@@ -149,7 +152,7 @@ def list_exam_problems(session, owner: str, exam_id: str, state) -> dict:
         st = prob.status if prob is not None else "not_read"
         if state and st != state:
             continue
-        badges, text_preview = [], ""
+        badges, text_preview, text_preview_tex = [], "", ""
         if prob is not None:
             _, blockers, _ = analyze(prob.content)
             if blockers:
@@ -157,10 +160,12 @@ def list_exam_problems(session, owner: str, exam_id: str, state) -> dict:
             if prob.status == "failed":
                 badges.append("읽지 못했어요")
             text_preview = preview(prob.content)
+            text_preview_tex = preview_tex(prob.content)
         active = active or st == "recognizing"
         items.append({"segment_id": seg.id, "page_id": seg.page_id, "number": seg.number, "bbox": list(seg.bbox),
                       "crop_url": image_url(prob.crop_ref) if prob is not None else None, "state": st,
-                      "problem_id": prob.id if prob is not None else None, "preview": text_preview, "badges": badges})
+                      "problem_id": prob.id if prob is not None else None, "preview": text_preview,
+                      "preview_tex": text_preview_tex, "badges": badges})
     return {"items": items, "poll_after_ms": POLL_MS if active else None}
 
 
@@ -297,12 +302,125 @@ def set_figure_region(session, owner: str, pid: str, fid: str, bbox) -> dict:
     return problem_view(session, p)
 
 
+def set_figure_clean_level(session, owner: str, pid: str, fid: str, level: int, store=None) -> dict:
+    """그림 정리 세기를 고른다(0 = 정리 안 한 원본). 이미 만들어 둔 단계 중에서 고르므로 작업은 만들지 않는다."""
+    p = _load(session, owner, pid, lock=True)
+    _require_editable(p)
+    fig = _figure(p, fid)
+    if fig.get("state") != "ready":
+        raise ApiError(409, "PROBLEM_BUSY")
+    ref = (fig.get("levels") or {}).get(str(level)) if level else None
+    if level and not ref:
+        raise ApiError(422, "REQUEST_INVALID", "그 정리 세기는 쓸 수 없어요.")
+    p.content = {**p.content, "figures": [
+        dict(f, clean_level=level, clean_ref=ref, use="clean" if ref else "raw", erased=False)
+        if f.get("id") == fid else f for f in p.content["figures"]]}
+    _bump(p)
+    session.commit()
+    if fig.get("erased"):   # 단계를 바꾸면 지운 결과는 버린다(웹이 먼저 확인을 받는다)
+        _drop_files(store, fig.get("clean_ref"))
+    return problem_view(session, p)
+
+
+def _drop_files(store, *refs) -> None:
+    """저장소에서 파일을 지운다. 실패해도 요청은 성공으로 둔다(작업자의 _drop과 같은 정책)."""
+    for ref in refs:
+        if ref and store is not None:
+            try:
+                store.delete(ref)
+            except StorageError:
+                pass
+
+
+def set_figure_erased(session, store, settings, owner: str, pid: str, fid: str, data: bytes) -> dict:
+    """낙서 지우개로 지운 결과(PNG)를 그림의 정리본으로 저장한다. 원래 정리 단계(levels)는 그대로 남는다."""
+    p = _load(session, owner, pid, lock=True)
+    _require_editable(p)
+    fig = _figure(p, fid)
+    if fig.get("state") != "ready":
+        raise ApiError(409, "PROBLEM_BUSY")
+    base_ref = fig.get("clean_ref")
+    if not base_ref:
+        raise ApiError(409, "FIGURE_NOT_CLEANED")
+    base = store.get(base_ref)
+    if base is None:
+        raise ApiError(404, "NOT_FOUND")
+    png = prepare_erased(data, base[0], settings.max_image_bytes)
+    new_ref = new_id("img")
+    store.put(new_ref, png, "image/png")
+    try:
+        p.content = {**p.content, "figures": [
+            dict(f, clean_ref=new_ref, erased=True, use="clean") if f.get("id") == fid else f
+            for f in p.content["figures"]]}
+        _bump(p)
+        session.commit()
+    except Exception:
+        session.rollback()
+        _drop_files(store, new_ref)   # 저장은 됐는데 기록이 실패하면 방금 올린 파일을 치운다
+        raise
+    if fig.get("erased"):
+        _drop_files(store, base_ref)  # 이전에 지운 결과는 더 쓰지 않는다
+    return problem_view(session, p)
+
+
+def reset_figure_erased(session, store, owner: str, pid: str, fid: str) -> dict:
+    """지운 결과를 버리고 고른 정리 단계의 그림으로 되돌린다(지운 적이 없으면 아무것도 안 한다)."""
+    p = _load(session, owner, pid, lock=True)
+    _require_editable(p)
+    fig = _figure(p, fid)
+    if fig.get("state") != "ready":
+        raise ApiError(409, "PROBLEM_BUSY")
+    if not fig.get("erased"):
+        return problem_view(session, p)
+    level = fig.get("clean_level") or 0
+    ref = (fig.get("levels") or {}).get(str(level)) if level else None
+    p.content = {**p.content, "figures": [
+        dict(f, clean_ref=ref, use="clean" if ref else "raw", erased=False) if f.get("id") == fid else f
+        for f in p.content["figures"]]}
+    _bump(p)
+    session.commit()
+    _drop_files(store, fig.get("clean_ref"))
+    return problem_view(session, p)
+
+
+MAX_REMOVED_FIGURES = 10   # 되살릴 수 있게 보관하는 지운 그림 수(문제당)
+
+
 def delete_figure(session, owner: str, pid: str, fid: str) -> dict:
     p = _load(session, owner, pid, lock=True)
     _require_editable(p)
-    _figure(p, fid)
+    fig = _figure(p, fid)
+    # 파일은 지우지 않고 그림 정보만 보관해 두면 언제든 되살릴 수 있다.
+    # content 안에 두면 자동 저장이 content를 새로 만들 때 사라지므로 ocr_meta에 둔다.
+    meta = dict(p.ocr_meta or {})
+    removed = [dict(fig, removed_at=datetime.now(timezone.utc).isoformat())] + [
+        r for r in meta.get("removed_figures") or [] if r.get("id") != fid]
+    p.ocr_meta = {**meta, "removed_figures": removed[:MAX_REMOVED_FIGURES]}
     p.content = {**p.content, "figures": [f for f in p.content["figures"] if f.get("id") != fid]}
     p.search_text = search_text(p.content)
     _bump(p)
+    session.commit()
+    return problem_view(session, p)
+
+
+def restore_figure(session, owner: str, pid: str, fid: str) -> dict:
+    """지운 그림을 되살린다(보관 중인 것만). 한 문제의 그림 수 한도는 그대로 지킨다."""
+    p = _load(session, owner, pid, lock=True)
+    _require_editable(p)
+    meta = dict(p.ocr_meta or {})
+    removed = list(meta.get("removed_figures") or [])
+    fig = next((r for r in removed if r.get("id") == fid), None)
+    if fig is None:
+        raise ApiError(404, "NOT_FOUND")
+    figures = list((p.content or {}).get("figures") or [])
+    if len(figures) >= MAX_FIGURES:
+        raise ApiError(422, "REQUEST_INVALID", "한 문제에 넣을 수 있는 그림 수를 넘었어요.")
+    fig = {k: v for k, v in fig.items() if k != "removed_at"}
+    p.ocr_meta = {**meta, "removed_figures": [r for r in removed if r.get("id") != fid]}
+    p.content = {**p.content, "figures": figures + [fig]}
+    p.search_text = search_text(p.content)
+    _bump(p)
+    if fig.get("state") == "processing":  # 정리 도중 지웠다면 그 작업은 버려졌으므로 다시 시킨다
+        enqueue(session, owner, "figure_clean", "figure", fid)
     session.commit()
     return problem_view(session, p)

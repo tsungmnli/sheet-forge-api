@@ -33,6 +33,8 @@ class PageProcessor(Protocol):
 class ReadResult:
     content: dict                                    # stem / choices (README 6.3). figures는 B5에서 채운다
     meta: dict = field(default_factory=dict)          # engine, tier 등. 문제 내용·이미지는 로그에 남기지 않는다
+    points: float | None = None                       # 사진에 인쇄된 배점. 못 읽었으면 None(기존 값을 건드리지 않는다)
+    figures: list = field(default_factory=list)       # 모델이 찾은 그림 상자 [{box_2d: [ymin,xmin,ymax,xmax](0~1000), placement}]. content["figures"]와 별개
 
 
 @dataclass(frozen=True)
@@ -48,8 +50,8 @@ class Recognizer(Protocol):
 
 
 class FigureCleaner(Protocol):
-    def clean(self, raw: bytes) -> CleanResult:
-        """그림 크롭 → 정리본(필기·그림자 제거). 실패하면 예외."""
+    def clean(self, raw: bytes, level: int = 2) -> CleanResult:
+        """그림 크롭 → 정리본(필기·그림자 제거). level은 정리 세기 1~4. 실패하면 예외."""
         ...
 
 

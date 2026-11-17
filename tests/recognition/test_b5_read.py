@@ -120,8 +120,16 @@ class ReadCropTest(unittest.TestCase):
         with self.assertRaises(ReadParseError):
             read_crop(FakeClient("not json"), "m", png(500, 500))
 
+    def test_points_parsed_and_sanitized(self):
+        base = {"stem": [para(T("값"))]}
+        self.assertEqual(parse_read_json(json.dumps(base))["points"], None)
+        self.assertEqual(parse_read_json(json.dumps(dict(base, points=4)))["points"], 4.0)
+        self.assertEqual(parse_read_json(json.dumps(dict(base, points=3.5)))["points"], 3.5)
+        for bad in (-1, 1001, "5", True):
+            self.assertEqual(parse_read_json(json.dumps(dict(base, points=bad)))["points"], None)
+
     def test_schema_requires_all_top_level_fields(self):
-        self.assertEqual(READ_SCHEMA["required"], ["stem", "choices", "figures", "uncertain", "unsupported_block"])
+        self.assertEqual(READ_SCHEMA["required"], ["stem", "choices", "figures", "uncertain", "unsupported_block", "points"])
         self.assertTrue(READ_SCHEMA["properties"]["choices"]["nullable"])
         self.assertEqual(READ_SCHEMA["properties"]["stem"]["items"]["properties"]["inlines"]["items"]["required"],
                          ["t", "v", "latex"])

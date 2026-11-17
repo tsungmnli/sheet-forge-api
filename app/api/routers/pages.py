@@ -5,9 +5,10 @@ from sqlalchemy.orm import Session
 from .. import segment_service, web_service as svc
 from ..concurrency import etag_json
 from ..deps import current_user, get_session
+from ..schemas_misc import ERR_SEGMENT, ERR_SEGMENTS_PUT, SegmentPatchOut, SegmentsPutOut
 from ..schemas_web import PageDetailOut, SegmentPatchIn, SegmentsPutIn
 
-router = APIRouter(prefix="/v1")
+router = APIRouter()
 
 
 @router.get("/pages/{page_id}", response_model=PageDetailOut)
@@ -23,14 +24,14 @@ def delete_page(page_id: str, owner: str = Depends(current_user), session: Sessi
     return Response(status_code=204)
 
 
-@router.patch("/pages/{page_id}/segments/{segment_id}")
+@router.patch("/pages/{page_id}/segments/{segment_id}", response_model=SegmentPatchOut, responses=ERR_SEGMENT)
 def patch_segment(page_id: str, segment_id: str, body: SegmentPatchIn, owner: str = Depends(current_user),
                   session: Session = Depends(get_session)):
     """문제 고르기/해제. 읽은 문제가 있는 칸을 해제하면 409 SEGMENT_HAS_PROBLEM."""
     return segment_service.set_marked(session, owner, page_id, segment_id, body.marked)
 
 
-@router.put("/pages/{page_id}/segments")
+@router.put("/pages/{page_id}/segments", response_model=SegmentsPutOut, responses=ERR_SEGMENTS_PUT)
 def put_segments(page_id: str, body: SegmentsPutIn, owner: str = Depends(current_user),
                  session: Session = Depends(get_session)):
     """"네모가 잘못됐어요" 저장: 칸 전체 목록으로 교체(id 있는 칸은 유지)."""

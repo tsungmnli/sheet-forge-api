@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from .. import worksheet_tools as svc
 from ..deps import current_user, get_session
 
-router = APIRouter(prefix="/v1")
+router = APIRouter()
 
 
 class SearchExam(BaseModel):

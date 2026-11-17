@@ -68,6 +68,7 @@ class RealRecognizer:
                     raise
                 retried = True
         usage = [_usage("read", model, res)]
+        figures = [dict(f) for f in obj.get("figures") or []]   # 수식 고치기 전에 챙겨 둔다
         if _is_empty(obj):
             raise ReadEmptyError("empty")
         meta = {"engine": "llm", "tier": tier, "model": model, "prompt": READ_PROMPT, "fixed_pieces": fixed_pieces,
@@ -86,4 +87,4 @@ class RealRecognizer:
         meta["math_failed"] = [_pos(f, "error_pos") for f in chk.failures]
         meta["math_warnings"] = [_pos(w, "warnings") for w in chk.warnings]
         meta["usage"] = usage
-        return ReadResult(content=to_content(obj), meta=meta)
+        return ReadResult(content=to_content(obj), meta=meta, points=obj.get("points"), figures=figures)

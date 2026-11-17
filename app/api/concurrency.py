@@ -3,7 +3,7 @@ import hashlib
 import json
 import re
 
-from fastapi import Request, Response
+from fastapi import Header, Request, Response
 
 from .errors import ApiError
 
@@ -14,7 +14,8 @@ def etag(version: int) -> str:
     return f'"{version}"'
 
 
-def require_if_match(request: Request) -> int:
+def require_if_match(request: Request,
+                     if_match: str | None = Header(None, alias="If-Match", description="수정할 리소스의 version(ETag 값)")) -> int:
     """If-Match에서 version을 읽는다. 없으면 428 VERSION_REQUIRED, 형식이 이상하면 400 REQUEST_INVALID.
 
     쓰는 곳: Depends(require_if_match). 값이 낡았는지는 repo.update_versioned가 412로 판정한다.

@@ -2,11 +2,9 @@
 
 poll_after_ms는 처리 중인 것이 있을 때만 값이 있고, 없으면 null이다(웹은 null이면 폴링을 멈춘다).
 """
-from typing import Literal
+from typing import Annotated, Literal, Union
 
 from pydantic import BaseModel, ConfigDict, Field
-
-from .schemas import ContentIn
 
 
 class ExamCreateIn(BaseModel):
@@ -120,9 +118,65 @@ class ReadIn(BaseModel):
     segment_ids: list[str] | None = Field(None, max_length=500)  # 50 초과는 서비스가 TOO_MANY_SEGMENTS로 거절
 
 
+# ---- PUT /problems/{id}/content 요청 모델 (README 6.3·6.4). 응답 ContentOut과 짝이다 ----
+# 모르는 키는 통과시킨다(웹이 받은 값을 그대로 돌려 보내도 되게). 값 길이·그림 참조 검사는 problem_logic이 한다.
+class _OpenIn(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+
+class TextInlineIn(_OpenIn):
+    t: Literal["text"]
+    v: str = ""
+    bold: bool | None = None
+    underline: bool | None = None
+    conf: float | None = None
+
+
+class MathInlineIn(_OpenIn):
+    t: Literal["math"]
+    latex: str = ""
+    breaks: list[int] | None = None
+    conf: float | None = None
+
+
+class ImageInlineIn(_OpenIn):
+    t: Literal["image"]
+    ref: str | None = None
+    conf: float | None = None
+
+
+InlineIn = Annotated[Union[TextInlineIn, MathInlineIn, ImageInlineIn], Field(discriminator="t")]
+
+
+class StemBlockIn(_OpenIn):
+    type: str = "paragraph"
+    inlines: list[InlineIn] = Field(default_factory=list)
+
+
+class ChoicesIn(_OpenIn):
+    items: list[list[InlineIn]] = Field(default_factory=list)
+    layout: str = "auto"
+
+
+class FigureEditIn(_OpenIn):
+    """그림은 서버가 만든 것만 있다. 요청에서는 use·placement·width_mm만 바뀐다(나머지는 받은 값 그대로 돌려 보내도 된다)."""
+    id: str | None = None
+    raw_ref: str | None = None
+    clean_ref: str | None = None
+    use: Literal["raw", "clean"] | None = None
+    placement: Literal["after_stem", "after_choices"] | None = None
+    width_mm: float | None = None
+
+
+class ContentPutBody(_OpenIn):
+    stem: list[StemBlockIn] = Field(default_factory=list)
+    choices: ChoicesIn | None = None
+    figures: list[FigureEditIn] = Field(default_factory=list)
+
+
 class ContentPutIn(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    content: ContentIn
+    content: ContentPutBody
     points: float | None = Field(None, ge=0, le=1000)
 
 
@@ -131,6 +185,11 @@ class FigureAddIn(BaseModel):
     bbox: list[float] = Field(min_length=4, max_length=4)
     placement: Literal["after_stem", "after_choices"] = "after_stem"
     width_mm: float = Field(60, ge=5, le=400)
+
+
+class FigureCleanLevelIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    level: int = Field(ge=0, le=4)   # 0 = 원본, 1~4 = 정리 세기
 
 
 class FigureRegionIn(BaseModel):

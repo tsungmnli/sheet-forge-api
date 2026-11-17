@@ -23,6 +23,7 @@ class Settings:
     minio_access_key: str = ""
     minio_secret_key: str = ""
     minio_bucket: str = "sheet-forge"
+    storage_dir: str = ""                # 개발 전용: 이 폴더에 이미지를 저장(MinIO보다 우선). 운영에서는 비워 둔다
     minio_secure: bool = False           # TLS(https) 사용 여부
     max_photo_bytes: int = 20 * 1024 * 1024
     max_pages_per_exam: int = 30
@@ -39,6 +40,17 @@ class Settings:
     llm_timeout_s: int = 30
     recognition_engine: str = "fake"   # B5-2c: fake | real. real이면 보정·분할에 실제 구현을 쓴다(LLM_API_KEY 필요)
     segment_image_long_side: int = 1500  # 분할 호출에 보내는 이미지의 긴 변(px)
+    # 로그인: auth_required가 꺼져 있으면 지금처럼 default_owner_id 한 명으로 동작한다(개발·테스트). 운영은 켠다.
+    auth_required: bool = False
+    session_ttl_days: int = 30           # 로그인 유지 기간(쓸수록 늘어난다)
+    cookie_secure: bool = True           # 세션 쿠키에 Secure. http로 개발할 때만 끈다
+    web_base_url: str = ""               # 메일 링크의 앞부분. 예: https://sheet-forge.example.com
+    # 메일(Resend SMTP). smtp_host가 비어 있으면 보내지 않고 로그에 남긴다
+    smtp_host: str = ""
+    smtp_port: int = 465
+    smtp_user: str = ""
+    smtp_password: str = ""
+    smtp_from: str = ""                  # 예: sheet-forge <no-reply@도메인>. Resend에서 인증한 도메인이어야 한다
 
     @classmethod
     def from_env(cls, env=None) -> "Settings":
@@ -55,6 +67,10 @@ class Settings:
             v = env.get(f"SHEET_FORGE_{name}")
             return v.strip() if v not in (None, "") else default
 
+        def flag(name, default):
+            v = env.get(f"SHEET_FORGE_{name}")
+            return default if v in (None, "") else v.strip().lower() in ("1", "true", "yes", "on")
+
         origins = env.get("SHEET_FORGE_CORS_ORIGINS", "")
         return cls(max_problems=num("MAX_PROBLEMS", d.max_problems), max_figures=num("MAX_FIGURES", d.max_figures),
                    max_image_bytes=num("MAX_IMAGE_BYTES", d.max_image_bytes),
@@ -70,6 +86,7 @@ class Settings:
                    minio_secret_key=text("MINIO_SECRET_KEY", d.minio_secret_key),
                    minio_bucket=text("MINIO_BUCKET", d.minio_bucket),
                    minio_secure=text("MINIO_SECURE", "").lower() in ("1", "true", "yes"),
+                   storage_dir=text("STORAGE_DIR", d.storage_dir),
                    max_photo_bytes=num("MAX_PHOTO_BYTES", d.max_photo_bytes),
                    max_pages_per_exam=num("MAX_PAGES_PER_EXAM", d.max_pages_per_exam),
                    max_read_batch=num("MAX_READ_BATCH", d.max_read_batch),
@@ -82,4 +99,11 @@ class Settings:
                    reread_model=text("REREAD_MODEL", d.reread_model),
                    llm_timeout_s=num("LLM_TIMEOUT_S", d.llm_timeout_s),
                    recognition_engine=text("RECOGNITION_ENGINE", d.recognition_engine).strip().lower(),
-                   segment_image_long_side=num("SEGMENT_IMAGE_LONG_SIDE", d.segment_image_long_side))
+                   segment_image_long_side=num("SEGMENT_IMAGE_LONG_SIDE", d.segment_image_long_side),
+                   auth_required=flag("AUTH_REQUIRED", d.auth_required),
+                   session_ttl_days=num("SESSION_TTL_DAYS", d.session_ttl_days),
+                   cookie_secure=flag("COOKIE_SECURE", d.cookie_secure),
+                   web_base_url=text("WEB_BASE_URL", d.web_base_url).rstrip("/"),
+                   smtp_host=text("SMTP_HOST", d.smtp_host), smtp_port=num("SMTP_PORT", d.smtp_port),
+                   smtp_user=text("SMTP_USER", d.smtp_user), smtp_password=text("SMTP_PASSWORD", d.smtp_password),
+                   smtp_from=text("SMTP_FROM", d.smtp_from))

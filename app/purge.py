@@ -15,7 +15,7 @@ from .storage.images import StorageError
 def _figure_refs(content) -> list:
     out = []
     for f in (content or {}).get("figures") or []:
-        out.extend(v for v in (f.get("raw_ref"), f.get("clean_ref")) if v)
+        out.extend(v for v in (f.get("raw_ref"), f.get("clean_ref"), *(f.get("levels") or {}).values()) if v)
     return out
 
 
@@ -32,11 +32,12 @@ def purge_trash(session, cutoff: datetime) -> dict:
         WorksheetItem.problem_id.in_(select(Problem.id).where(*old(Problem)))
         | WorksheetItem.worksheet_id.in_(select(Worksheet.id).where(*old(Worksheet)))))
     # 2. 문제 → 칸 → 사진 → 시험지 (아래쪽이 위쪽을 참조하므로 이 순서)
-    rows = session.execute(delete(Problem).where(*old(Problem)).returning(Problem.crop_ref, Problem.content)).all()
+    rows = session.execute(delete(Problem).where(*old(Problem)).returning(Problem.crop_ref, Problem.content, Problem.ocr_meta)).all()
     counts["problem"] = len(rows)
-    for crop_ref, content in rows:
+    for crop_ref, content, meta in rows:
         refs.extend([crop_ref] if crop_ref else [])
         refs.extend(_figure_refs(content))
+        refs.extend(_figure_refs({"figures": (meta or {}).get("removed_figures")}))  # 지웠지만 보관 중이던 그림
     counts["segment"] = session.execute(delete(Segment).where(
         *old(Segment), ~exists(select(Problem.id).where(Problem.segment_id == Segment.id)))).rowcount
     rows = session.execute(delete(Page).where(

@@ -8,7 +8,7 @@ from ..deps import current_user, get_session, get_settings
 from ..schemas_ws import (ProblemIdsIn, WorksheetCreateIn, WorksheetListOut, WorksheetOut, WorksheetPatchIn)
 from ..settings import Settings
 
-router = APIRouter(prefix="/v1")
+router = APIRouter()
 
 
 def _view(response: Response, session: Session, owner: str, wid: str) -> dict:
@@ -60,7 +60,8 @@ def add_problems(worksheet_id: str, body: ProblemIdsIn, response: Response, owne
     return _view(response, session, owner, worksheet_id)
 
 
-@router.post("/worksheets/{worksheet_id}/duplicate", status_code=201, response_model=WorksheetOut)
+@router.post("/worksheets/{worksheet_id}/duplicate", status_code=201, response_model=WorksheetOut,
+             operation_id="duplicate_worksheet")
 def duplicate_worksheet(worksheet_id: str, response: Response, owner: str = Depends(current_user),
                         session: Session = Depends(get_session)):
     new_id = svc.duplicate_worksheet(session, owner, worksheet_id)

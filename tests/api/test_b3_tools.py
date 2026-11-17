@@ -30,9 +30,9 @@ class UnitTest(unittest.TestCase):
 
     def test_openapi_has_tools_routes(self):
         paths = create_app(Settings()).openapi()["paths"]
-        self.assertIn("get", paths["/v1/problems"])
-        self.assertIn("/v1/problems/{pid}", paths)                          # 기존 경로와 공존
-        self.assertIn("/v1/worksheets/{worksheet_id}/check", paths)
+        self.assertIn("get", paths["/problems"])
+        self.assertIn("/problems/{pid}", paths)                          # 기존 경로와 공존
+        self.assertIn("/worksheets/{worksheet_id}/check", paths)
 
 
 @unittest.skipUnless(TEST_URL, "SHEET_FORGE_TEST_DATABASE_URL 없음 (DB 통합 테스트 건너뜀)")
@@ -63,7 +63,7 @@ class ToolsFlowTest(unittest.TestCase):
     _ws = b3.WorksheetFlowTest._ws
 
     def _search(self, qs=""):
-        r = self.c.get(f"/v1/problems{qs}")
+        r = self.c.get(f"/problems{qs}")
         self.assertEqual(r.status_code, 200, r.text)
         return r.json()
 
@@ -82,47 +82,47 @@ class ToolsFlowTest(unittest.TestCase):
         self.assertTrue(word)
         self.assertIn(item["id"], [i["id"] for i in self._search(f"?q={word}")["items"]])
         self.assertEqual(self._search("?q=zzzzqqqq")["items"], [])
-        self.assertEqual(self.c.get("/v1/problems?status=bogus").status_code, 422)
+        self.assertEqual(self.c.get("/problems?status=bogus").status_code, 422)
 
     def test_search_in_worksheet_paging_owner_deleted(self):
         exam_id, ids = self._exam()
         ws = self._ws(problem_ids=[ids[0]])
         got = self._search(f"?worksheet_id={ws['id']}")["items"]
         self.assertEqual({i["id"]: i["in_worksheet"] for i in got}, {ids[0]: True, ids[1]: False})
-        self.assertEqual(self.c.get("/v1/problems?worksheet_id=ws_nope").status_code, 404)
+        self.assertEqual(self.c.get("/problems?worksheet_id=ws_nope").status_code, 404)
         page1 = self._search("?limit=1")
         self.assertEqual(len(page1["items"]), 1)
         page2 = self._search(f"?limit=1&cursor={page1['next_cursor']}")
         self.assertEqual(len(page2["items"]), 1)
         self.assertNotEqual(page1["items"][0]["id"], page2["items"][0]["id"])
-        self.assertEqual(self._client(owner="o2").get("/v1/problems").json()["items"], [])
-        self.assertEqual(self.c.delete(f"/v1/problems/{ids[0]}").status_code, 204)
+        self.assertEqual(self._client(owner="o2").get("/problems").json()["items"], [])
+        self.assertEqual(self.c.delete(f"/problems/{ids[0]}").status_code, 204)
         self.assertEqual([i["id"] for i in self._search()["items"]], [ids[1]])     # 지운 문제는 안 나온다
 
     def test_check(self):
         exam_id, ids = self._exam()
         empty = self._ws()
-        r = self.c.get(f"/v1/worksheets/{empty['id']}/check").json()
+        r = self.c.get(f"/worksheets/{empty['id']}/check").json()
         self.assertEqual((r["ready"], [i["code"] for i in r["items"]]), (False, ["EMPTY_EXPORT"]))
         ws = self._ws(from_exam_id=exam_id)
-        r = self.c.get(f"/v1/worksheets/{ws['id']}/check").json()
+        r = self.c.get(f"/worksheets/{ws['id']}/check").json()
         self.assertEqual((r["ready"], r["items"]), (True, []))
-        added = self.c.post(f"/v1/worksheets/{ws['id']}/problems", json={"problem_ids": [ids[2]]}).json()
-        r = self.c.get(f"/v1/worksheets/{ws['id']}/check").json()
+        added = self.c.post(f"/worksheets/{ws['id']}/problems", json={"problem_ids": [ids[2]]}).json()
+        r = self.c.get(f"/worksheets/{ws['id']}/check").json()
         self.assertTrue(r["ready"])
         self.assertEqual([(i["code"], i["severity"], i["problem_ids"]) for i in r["items"]],
                          [("UNCONFIRMED", "warn", [ids[2]])])
-        self.assertEqual(self.c.patch(f"/v1/worksheets/{ws['id']}", json={"unconfirmed_policy": "fail"},
+        self.assertEqual(self.c.patch(f"/worksheets/{ws['id']}", json={"unconfirmed_policy": "fail"},
                                       headers=H(added["version"])).status_code, 200)
-        r = self.c.get(f"/v1/worksheets/{ws['id']}/check").json()
+        r = self.c.get(f"/worksheets/{ws['id']}/check").json()
         self.assertEqual((r["ready"], [i["code"] for i in r["items"]]), (False, ["UNCONFIRMED_BLOCKS"]))
-        self.assertEqual(self.c.delete(f"/v1/problems/{ids[0]}").status_code, 204)
-        v = self.c.get(f"/v1/worksheets/{ws['id']}").json()["version"]
-        self.assertEqual(self.c.patch(f"/v1/worksheets/{ws['id']}", json={"unconfirmed_policy": "skip"},
+        self.assertEqual(self.c.delete(f"/problems/{ids[0]}").status_code, 204)
+        v = self.c.get(f"/worksheets/{ws['id']}").json()["version"]
+        self.assertEqual(self.c.patch(f"/worksheets/{ws['id']}", json={"unconfirmed_policy": "skip"},
                                       headers=H(v)).status_code, 200)
-        r = self.c.get(f"/v1/worksheets/{ws['id']}/check").json()
+        r = self.c.get(f"/worksheets/{ws['id']}/check").json()
         self.assertEqual((r["ready"], sorted(i["code"] for i in r["items"])), (True, ["DELETED", "UNCONFIRMED"]))
-        self.assertEqual(self._client(owner="o2").get(f"/v1/worksheets/{ws['id']}/check").status_code, 404)
+        self.assertEqual(self._client(owner="o2").get(f"/worksheets/{ws['id']}/check").status_code, 404)
 
 
 if __name__ == "__main__":

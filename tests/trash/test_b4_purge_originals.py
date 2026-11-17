@@ -15,7 +15,7 @@ class PurgeOriginalsTest(_Base):
         """사진 3장: p1 40일 전·보정본 있음, p2 10일 전·보정본 있음, p3 40일 전·보정본 없음."""
         exam_id, _, _ = self._exam(0)
         files = [("files", ("p.png", make_png(40, 30), "image/png"))] * 2
-        self.assertEqual(self.c.post(f"/v1/exams/{exam_id}/pages", files=files).status_code, 202)
+        self.assertEqual(self.c.post(f"/exams/{exam_id}/pages", files=files).status_code, 202)
         with self.db.session() as s:
             rows = s.execute(text("SELECT id, original_ref FROM pages ORDER BY position")).all()
             spec = [(40, "img_c1"), (10, "img_c2"), (40, None)]
@@ -45,18 +45,18 @@ class PurgeOriginalsTest(_Base):
         self.assertNotIn(o1, self.store.objects)
         self.assertIn("img_c1", self.store.objects)                       # 보정본은 남음
         self.assertEqual((self._original(p2), self._original(p3)), (o2, o3))   # 10일 전, 보정본 없는 것은 그대로
-        detail = self.c.get(f"/v1/pages/{p1}").json()["image"]
+        detail = self.c.get(f"/pages/{p1}").json()["image"]
         self.assertIsNone(detail["original_url"])
         self.assertTrue(detail["corrected_url"])
         self.assertEqual(self._purge()["pages"], 0)                       # 멱등
         # 설정을 7일로 줄이면 p2도 만료
-        self.assertEqual(self.c.patch("/v1/me/settings", json={"original_photo_retention_days": 7}).status_code, 200)
+        self.assertEqual(self.c.patch("/me/settings", json={"original_photo_retention_days": 7}).status_code, 200)
         self.assertEqual(self._purge()["pages"], 1)
         self.assertIsNone(self._original(p2))
 
     def test_keep_forever_setting(self):
         _, rows = self._setup_pages()
-        self.assertEqual(self.c.patch("/v1/me/settings", json={"original_photo_retention_days": 0}).status_code, 200)
+        self.assertEqual(self.c.patch("/me/settings", json={"original_photo_retention_days": 0}).status_code, 200)
         self.assertEqual(self._purge()["pages"], 0)
         self.assertEqual(self._original(rows[0][0]), rows[0][1])
 

@@ -2,6 +2,8 @@
 
 content 구조는 README 6.3 그대로(stem / choices / figures). 선택지 기호와 문항 번호는 저장하지 않는다.
 """
+import re
+
 from ..export.math.convert import convert
 from .errors import ApiError
 from .schemas import ContentIn
@@ -122,6 +124,36 @@ def preview(content: dict, limit: int = 100) -> str:
                 parts.append(inl.get("latex") or "")
     s = " ".join("".join(parts).split())
     return s if len(s) <= limit else s[:limit].rstrip() + "…"
+
+
+def preview_tex(content: dict, limit: int = 100) -> str:
+    """목록 렌더링용 요약. preview와 같지만 수식을 $…$로 감싼다. 수식은 중간에서 자르지 않는다."""
+    out, n, cut = [], 0, False
+    for block in content.get("stem") or []:
+        for inl in block.get("inlines") or []:
+            t = inl.get("t")
+            if t == "text":
+                s = re.sub(r"\s+", " ", inl.get("v") or "")
+                if n + len(s) > limit:
+                    out.append(s[: limit - n].rstrip())
+                    cut = True
+                    break
+                out.append(s)
+                n += len(s)
+            elif t == "math":
+                latex = (inl.get("latex") or "").strip()
+                if not latex:
+                    continue
+                if n + len(latex) > limit:
+                    cut = True
+                    break
+                out.append("$" + latex + "$")
+                n += len(latex)
+        if cut:
+            break
+        out.append(" ")
+    s = "".join(out).strip()
+    return s + "…" if cut else s
 
 
 def search_text(content: dict, limit: int = 20000) -> str:

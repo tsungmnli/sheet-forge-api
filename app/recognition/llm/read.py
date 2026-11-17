@@ -3,6 +3,7 @@
 스키마 검증 실패 시 같은 모델로 1회 다시 부르는 일, 수식 변환기 점검과 수리 호출은 B5-3b에서 한다.
 content 계약(문단 type, 선택지 items, 그림 좌표 변환)으로 맞추는 어댑터도 B5-3b다."""
 import json
+import logging
 import math
 import re
 from pathlib import Path
@@ -13,13 +14,15 @@ from .repair import normalize_read
 from .schemas import READ_SCHEMA
 from .segment import shrink_for_segment
 
-PROMPT_VERSION = "read_v3"
+log = logging.getLogger("sheet_forge.recognition")
+
+PROMPT_VERSION = "read_v4"
 PROMPT_PATH = Path(__file__).resolve().parent.parent / "prompts" / (PROMPT_VERSION + ".md")
 READ_LONG_SIDE = 1000       # 설계 6.1: 크롭을 긴 변 약 1,000px로(작으면 확대하지 않는다)
 DEFAULT_MAX_OUTPUT = 4096   # 설계는 약 2,000. 추론 설정(B5-3b)이 정해지기 전이라 넉넉히 둔다
 
 # 파서(app/export/math/parser.py)가 다루는 구조 명령. 기호·함수는 vocab.py에서 뽑는다.
-STRUCT = r"\frac{분자}{분모}, \sqrt{}, 위 첨자 ^, 아래 첨자 _, \overline{}, \left … \right, \begin{cases} … \end{cases}, \text{}, \mathrm{}"
+STRUCT = r"\frac{분자}{분모}, \sqrt{}, 위 첨자 ^, 아래 첨자 _, \overline{}, \dot{}(글자 위 점), \left … \right, \begin{cases} … \end{cases}, \text{}, \mathrm{}"
 
 
 class ReadParseError(ValueError):
@@ -100,8 +103,15 @@ def _figure(f):
     return {"box_2d": nums, "placement": pl if pl in ("after_stem", "after_choices") else "after_stem"}
 
 
+def _points(v):
+    """배점은 0 이상 1000 이하의 유한한 숫자만 받는다(PUT content의 points 검증과 같은 범위). 그 밖은 None."""
+    if isinstance(v, bool) or not isinstance(v, (int, float)) or not math.isfinite(v) or not 0 <= v <= 1000:
+        return None
+    return float(v)
+
+
 def parse_read_json(text: str) -> dict:
-    """LLM 출력(JSON 문자열) -> {"stem","choices","figures","uncertain","unsupported_block"}.
+    """LLM 출력(JSON 문자열) -> {"stem","choices","figures","uncertain","unsupported_block","points"}.
     stem·choices의 형태가 틀리면 ReadParseError. 빠진 선택 필드는 기본값으로 채우고, 좌표가 틀린 그림 항목은 버린다."""
     data = _loads(text)
     if not isinstance(data, dict) or not isinstance(data.get("stem"), list):
@@ -110,19 +120,30 @@ def parse_read_json(text: str) -> dict:
     figures = data.get("figures")
     uncertain = data.get("uncertain")
     block = data.get("unsupported_block")
-    return {
+    out = {
         "stem": _paragraphs(data["stem"]),
         "choices": None if choices is None else _paragraphs(choices),
         "figures": [f for f in (_figure(x) for x in figures) if f] if isinstance(figures, list) else [],
         "uncertain": [{"where": str(u.get("where", "")), "reason": str(u.get("reason", ""))}
                       for u in uncertain if isinstance(u, dict)] if isinstance(uncertain, list) else [],
         "unsupported_block": block if isinstance(block, str) else None,
+        "points": _points(data.get("points")),
     }
+    # 진단용: 문제 내용은 남기지 않고 개수만 남긴다. figures는 (쓸 수 있는 것/모델이 준 것)이다.
+    log.info("읽기 결과 stem=%d choices=%s figures=%d/%d uncertain=%d points=%s block=%s",
+             len(out["stem"]), "없음" if out["choices"] is None else len(out["choices"]),
+             len(out["figures"]), len(figures) if isinstance(figures, list) else 0, len(out["uncertain"]),
+             "있음" if out["points"] is not None else "없음", "있음" if out["unsupported_block"] else "없음")
+    return out
 
 
 def read_crop(client, model: str, crop: bytes, *, long_side: int = READ_LONG_SIDE, limits: LlmLimits | None = None):
     """(정규화한 읽기 결과 dict, LlmResult, 고친 조각 수)를 돌려준다. LlmResult는 usage_events 기록용(B5-3c)."""
     limits = limits or LlmLimits(max_output_tokens=DEFAULT_MAX_OUTPUT)
     result = client.generate(model, shrink_for_segment(crop, long_side), load_prompt(), READ_SCHEMA, limits)
-    obj = parse_read_json(result.text)
+    try:
+        obj = parse_read_json(result.text)
+    except ReadParseError as e:
+        # 응답 내용은 남기지 않고, 어떻게 깨졌는지만 알린다(진단용)
+        raise ReadParseError(f"{e} finish={result.finish_reason} out={result.output_tokens} think={result.thinking_tokens} chars={len(result.text)}") from None
     return obj, result, normalize_read(obj)

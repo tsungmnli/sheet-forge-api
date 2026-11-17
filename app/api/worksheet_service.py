@@ -18,10 +18,6 @@ from .problem_logic import preview
 from .repo import alive, soft_delete, update_versioned
 from .serialize import image_url, iso
 
-DEFAULT_HEADER = {"title": "", "show_name_field": True, "show_date_field": True, "free_line": "",
-                  "prefill_name": False}
-
-
 def assign_numbers(flags: list, preset: dict, policy: str) -> list:
     """flags = [(삭제됨, 상태), ...] 순서대로 번호(문자열) 또는 None을 돌려준다."""
     numbering = (preset or {}).get("numbering") or {}
@@ -105,7 +101,7 @@ def worksheet_view(session, ws: Worksheet) -> dict:
     except PresetError:
         layout = None
     return {"id": ws.id, "title": ws.title, "student": ws.student, "version": ws.version, "items": items,
-            "preset": ws.preset, "preset_id": None, "header": ws.header,
+            "preset": ws.preset, "preset_id": None,
             "unconfirmed_policy": ws.unconfirmed_policy, "layout": layout, "last_export": ws.last_export,
             "updated_at": iso(ws.updated_at)}
 
@@ -152,7 +148,7 @@ def create_worksheet(session, owner: str, body, settings) -> str:
         _require_problems(session, owner, ids)
     _check_limit(len(ids), settings)
     ws = Worksheet(id=new_id("ws"), owner_id=owner, title=body.title, student=student,
-                   preset=ExportPreset().to_dict(), header=copy.deepcopy(DEFAULT_HEADER))
+                   preset=ExportPreset().to_dict())
     session.add(ws)
     session.flush()
     _replace_items(session, ws.id, ids)
@@ -166,8 +162,6 @@ def patch_worksheet(session, owner: str, wid: str, version: int, body) -> None:
         values["title"] = body.title
     if body.student is not None:
         values["student"] = body.student
-    if body.header is not None:
-        values["header"] = body.header.model_dump()
     if body.unconfirmed_policy is not None:
         values["unconfirmed_policy"] = body.unconfirmed_policy
     if body.preset is not None and body.preset_id is not None:
@@ -194,7 +188,7 @@ def duplicate_worksheet(session, owner: str, wid: str) -> str:
     src = _load(session, owner, wid)
     title = f"{src.title} 복사본"[:200] if src.title else ""
     ws = Worksheet(id=new_id("ws"), owner_id=owner, title=title, student=src.student,
-                   preset=copy.deepcopy(src.preset), header=copy.deepcopy(src.header),
+                   preset=copy.deepcopy(src.preset),
                    unconfirmed_policy=src.unconfirmed_policy)
     ids = _current_ids(session, wid)
     session.add(ws)

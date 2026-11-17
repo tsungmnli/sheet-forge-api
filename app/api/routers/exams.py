@@ -1,6 +1,5 @@
 """시험지와 사진 (웹 REST API 설계 5.2·5.3)."""
 from datetime import datetime
-from typing import Literal
 
 from fastapi import APIRouter, Depends, File, Query, Request, Response, UploadFile
 from sqlalchemy.orm import Session
@@ -13,13 +12,14 @@ from ..deps import current_user, get_now, get_session, get_settings, get_store
 from ..errors import ApiError
 from ..photos import sniff_image
 from ..repo import update_versioned
+from ..schemas_problem import ERR_COMMON, ERR_MARK, ERR_READ, ListState, MarkOut, ProblemListOut, ReadOut
 from ..schemas_web import (ExamCreateIn, ExamListOut, ExamOut, ExamPatchIn, PageListOut, PageOrderIn,
                            ReadIn, SegmentsMarkIn)
 from ..serialize import POLL_MS, page_out
 from ..settings import Settings
 from ...db.ids import new_id
 
-router = APIRouter(prefix="/v1")
+router = APIRouter()
 
 
 @router.post("/exams", status_code=201, response_model=ExamOut)
@@ -101,7 +101,7 @@ def reorder_pages(exam_id: str, body: PageOrderIn, owner: str = Depends(current_
     return svc.reorder_pages(session, owner, exam_id, body.page_ids)
 
 
-@router.post("/exams/{exam_id}/segments/mark")
+@router.post("/exams/{exam_id}/segments/mark", response_model=MarkOut, responses=ERR_MARK)
 def mark_segments(exam_id: str, body: SegmentsMarkIn, owner: str = Depends(current_user),
                   session: Session = Depends(get_session)):
     """한꺼번에 고르기/해제. 범위: segment_ids → 그 칸들, page_id → 그 사진 전부, 둘 다 없으면 시험지 전부."""
@@ -110,7 +110,7 @@ def mark_segments(exam_id: str, body: SegmentsMarkIn, owner: str = Depends(curre
     return segment_service.mark_many(session, owner, exam_id, body.marked, body.segment_ids, body.page_id)
 
 
-@router.post("/exams/{exam_id}/read", status_code=202)
+@router.post("/exams/{exam_id}/read", status_code=202, response_model=ReadOut, responses=ERR_READ)
 def read_problems(exam_id: str, body: ReadIn | None = None, owner: str = Depends(current_user),
                   session: Session = Depends(get_session), settings: Settings = Depends(get_settings),
                   now: datetime = Depends(get_now)):
@@ -119,8 +119,7 @@ def read_problems(exam_id: str, body: ReadIn | None = None, owner: str = Depends
     return problem_service.read_segments(session, owner, exam_id, ids, settings, now)
 
 
-@router.get("/exams/{exam_id}/problems")
-def list_problems(exam_id: str, state: Literal["not_read", "recognizing", "needs_review", "confirmed", "failed"]
-                  | None = Query(None), owner: str = Depends(current_user), session: Session = Depends(get_session)):
+@router.get("/exams/{exam_id}/problems", response_model=ProblemListOut, responses=ERR_COMMON)
+def list_problems(exam_id: str, state: ListState | None = Query(None), owner: str = Depends(current_user), session: Session = Depends(get_session)):
     """시험지 '문제' 탭. 항목은 고른 칸이고 읽기 전 칸도 not_read로 나온다."""
     return problem_service.list_exam_problems(session, owner, exam_id, state)

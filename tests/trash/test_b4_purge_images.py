@@ -25,7 +25,7 @@ class PurgeImagesTest(_Base):
         self._exam(1)
         kept = set(self.store.objects) - gone
         self.assertTrue(kept)
-        self.assertEqual(self.c.delete(f"/v1/exams/{exam1}").status_code, 204)
+        self.assertEqual(self.c.delete(f"/exams/{exam1}").status_code, 204)
         self._age(31)
         with self.db.session() as s:
             res = purge_trash_with_images(s, self.store, datetime.now(timezone.utc) - timedelta(days=30))

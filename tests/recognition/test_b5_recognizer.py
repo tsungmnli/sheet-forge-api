@@ -60,7 +60,7 @@ class ReadTest(unittest.TestCase):
         self.assertEqual(r.content["choices"], {"items": [[{"t": "math", "latex": "3"}]], "layout": "auto"})
         self.assertEqual(r.content["figures"], [])
         m = r.meta
-        self.assertEqual((m["engine"], m["tier"], m["model"], m["prompt"], m["retried"]), ("llm", "default", "lite", "read_v3", False))
+        self.assertEqual((m["engine"], m["tier"], m["model"], m["prompt"], m["retried"]), ("llm", "default", "lite", "read_v4", False))
         self.assertEqual((m["math_repaired"], m["math_failed"], m["math_warnings"]), (0, [], []))
         self.assertEqual([u["call"] for u in m["usage"]], ["read"])
         self.assertNotIn("값을", json.dumps(m, ensure_ascii=False))

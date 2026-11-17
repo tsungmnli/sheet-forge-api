@@ -34,6 +34,7 @@ GOLDEN = [
     (r"a \le b", "a LEQ b"),
     (r"a \ne b", "a != b"),
     (r"\overline{AB}", "bar {AB}"),
+    (r"\dot{6}", "dot {6}"),
 ]
 
 

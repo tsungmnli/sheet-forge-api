@@ -3,15 +3,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-
-class HeaderIn(BaseModel):
-    """위쪽 제목칸 설정. M7 전에는 저장만 한다(REST 5.7)."""
-    model_config = ConfigDict(str_strip_whitespace=True)
-    title: str = Field("", max_length=200)
-    show_name_field: bool = True
-    show_date_field: bool = True
-    free_line: str = Field("", max_length=200)
-    prefill_name: bool = False
+from .preset_shape import PresetValue, PresetValueOut
 
 
 class WorksheetCreateIn(BaseModel):
@@ -26,8 +18,7 @@ class WorksheetPatchIn(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True)
     title: str | None = Field(None, max_length=200)
     student: str | None = Field(None, max_length=100)
-    header: HeaderIn | None = None
-    preset: dict | None = None
+    preset: PresetValue | None = None
     preset_id: str | None = Field(None, max_length=60)
     unconfirmed_policy: Literal["skip", "fail"] | None = None
 
@@ -57,9 +48,8 @@ class WorksheetOut(BaseModel):
     student: str
     version: int
     items: list[WsItemOut]
-    preset: dict
+    preset: PresetValueOut
     preset_id: str | None = None
-    header: HeaderIn
     unconfirmed_policy: str
     layout: dict | None
     last_export: dict | None

@@ -1965,6 +1965,7 @@ version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
     { name = "alembic" },
+    { name = "argon2-cffi" },
     { name = "fastapi", version = "0.162.5", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
     { name = "fastapi", version = "0.163.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
     { name = "lxml" },
@@ -2004,6 +2005,7 @@ fit = [
 [package.metadata]
 requires-dist = [
     { name = "alembic", specifier = ">=1.13" },
+    { name = "argon2-cffi", specifier = ">=23.1" },
     { name = "fastapi", specifier = ">=0.110" },
     { name = "lxml", specifier = ">=5.2" },
     { name = "minio", specifier = ">=7.2" },

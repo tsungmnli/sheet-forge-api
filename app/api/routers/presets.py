@@ -6,20 +6,21 @@ from sqlalchemy.orm import Session
 from .. import preset_service as svc
 from ..concurrency import etag, require_if_match
 from ..deps import current_user, get_session
+from ..preset_shape import PresetValue, PresetValueOut
 
-router = APIRouter(prefix="/v1")
+router = APIRouter()
 
 
 class PresetIn(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True)
     name: str = Field(min_length=1, max_length=100)
-    preset: dict
+    preset: PresetValue
 
 
 class PresetOut(BaseModel):
     id: str
     name: str
-    preset: dict
+    preset: PresetValueOut
     builtin: bool
     version: int | None
 

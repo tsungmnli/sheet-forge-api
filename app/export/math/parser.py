@@ -312,6 +312,8 @@ class Parser:
             return self.text_like(name, tok)
         if name == "overline":
             return Deco("bar", self.parse_arg())
+        if name == "dot":
+            return Deco("dot", self.parse_arg())   # 순환소수: 한글 `dot {…}`
         if name == "left":
             return self.left_right(pos)
         if name == "right":

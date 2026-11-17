@@ -1,4 +1,4 @@
-"""문제지 내보내기 엔드포인트 (REST 설계 5.7). 응답 모양은 `/v1/exports`와 같다."""
+"""문제지 내보내기 엔드포인트 (REST 설계 5.7). 응답 모양은 `/exports`와 같다."""
 import base64
 import json
 import logging
@@ -10,15 +10,17 @@ from fastapi import APIRouter, Depends, Query, Request, Response
 from sqlalchemy.orm import Session
 
 from ..deps import current_user, get_now, get_ro_session, get_session, get_settings, get_store
+from ..schemas_misc import ERR_EXPORT, HWPX_200, ExportOut
 from ..settings import Settings
-from ..worksheet_export import add_links, record_last_export, run_worksheet_export
+from ..worksheet_export import record_last_export, run_worksheet_export, web_report
 
-router = APIRouter(prefix="/v1")
+router = APIRouter()
 log = logging.getLogger("sheet_forge.api")
 HWPX_MEDIA = "application/vnd.hancom.hwpx"
 
 
-@router.post("/worksheets/{worksheet_id}/export")
+@router.post("/worksheets/{worksheet_id}/export", response_model=ExportOut,
+             responses={**HWPX_200, **ERR_EXPORT})
 def export_worksheet(worksheet_id: str, request: Request, format: str = Query("json", pattern="^(json|hwpx)$"),
                      owner: str = Depends(current_user), ro_session: Session = Depends(get_ro_session),
                      session: Session = Depends(get_session), store=Depends(get_store),
@@ -36,6 +38,6 @@ def export_worksheet(worksheet_id: str, request: Request, format: str = Query("j
         return Response(result.hwpx_bytes, media_type=HWPX_MEDIA, headers={
             "Content-Disposition": f"attachment; filename=\"export.hwpx\"; filename*=UTF-8''{quote(name)}",
             "X-Export-Status": report.status, "X-Export-Warnings": str(n("warn")), "X-Export-Errors": str(n("error"))})
-    return {"report": add_links(report.to_dict(), links),
+    return {"report": web_report(report.to_dict(), links),
             "file": {"name": name, "size": len(result.hwpx_bytes),
                      "content_base64": base64.b64encode(result.hwpx_bytes).decode("ascii")}}

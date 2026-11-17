@@ -17,6 +17,7 @@ from ..db.ids import new_id
 from ..db.models import Page, Segment
 from ..recognition.factory import build_cleaner, build_processor, build_recognizer
 from ..recognition.fake import FakeFigureCleaner, FakePageProcessor
+from ..recognition.llm.read import ReadParseError
 from ..recognition.usage import llm_event, record_job_usage
 from ..storage.images import StorageError, build_store
 from . import maintenance
@@ -94,6 +95,8 @@ def run_once(db, store, processor, max_attempts: int = MAX_ATTEMPTS, retry_delay
         jobs.complete(db, job.id)
     except Exception as exc:  # noqa: BLE001
         code = type(exc).__name__
+        if isinstance(exc, ReadParseError):
+            code = f"{code}({exc})"  # 종류와 토큰 수만 담긴 메시지
         log.error("작업 실패 kind=%s target=%s attempts=%d %s", job.kind, job.target_id, job.attempts, code)
         final = job.attempts >= max_attempts or isinstance(exc, UnknownJob)
         if final:
@@ -110,7 +113,8 @@ def run_once(db, store, processor, max_attempts: int = MAX_ATTEMPTS, retry_delay
     return True
 
 
-def main() -> None:
+def main(stop: threading.Event | None = None) -> None:
+    """stop을 받으면(API 안에서 스레드로 돌 때) 시그널 처리는 하지 않고 그 이벤트로만 멈춘다."""
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
     settings = Settings.from_env()
     if not settings.database_url:
@@ -124,9 +128,10 @@ def main() -> None:
     poll_s = float(os.environ.get("SHEET_FORGE_WORKER_POLL_S", "2"))
     maint_s = float(os.environ.get("SHEET_FORGE_MAINTENANCE_INTERVAL_S", "86400"))  # 0이면 정기 정리를 하지 않는다
     next_maint = time.monotonic()  # 시작 직후 한 번, 그 뒤 maint_s마다
-    stop = threading.Event()
-    for sig in (signal.SIGINT, signal.SIGTERM):
-        signal.signal(sig, lambda *_: stop.set())
+    if stop is None:
+        stop = threading.Event()
+        for sig in (signal.SIGINT, signal.SIGTERM):
+            signal.signal(sig, lambda *_: stop.set())
     while not stop.is_set():
         if maint_s > 0 and time.monotonic() >= next_maint:
             next_maint = time.monotonic() + maint_s

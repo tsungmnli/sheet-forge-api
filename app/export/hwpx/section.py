@@ -34,8 +34,11 @@ def equation_xml(eq_id: int, z_order: int, script: str, base_unit: int) -> str:
             f'<hp:script>{escape(script)}</hp:script></hp:equation>')
 
 
-def picture_xml(pic_id: int, z_order: int, bin_id: int, w: int, h: int) -> str:
-    """hp:pic 최소형 [검증 4.7.2 t15a]. orgSz = curSz = sz, scaMatrix 항등, imgRect·imgClip은 org 기준."""
+def picture_xml(pic_id: int, z_order: int, bin_id: int, w: int, h: int, org_w: int = 0, org_h: int = 0) -> str:
+    """hp:pic 최소형 [검증 4.7.2 t15a]. orgSz = curSz = sz, scaMatrix 항등.
+    imgClip은 이미지 원본 크기 기준이다(줄인 그림에서 표시 크기를 쓰면 일부만 확대되어 보인다) [검증 2026-11-17]."""
+    cw = org_w or w
+    ch = org_h or h
     return (f'<hp:pic id="{pic_id}" zOrder="{z_order}" numberingType="PICTURE" textWrap="TOP_AND_BOTTOM" '
             f'textFlow="BOTH_SIDES" lock="0" dropcapstyle="None" href="" groupLevel="0" instid="{pic_id}" reverse="0">'
             f'<hp:orgSz width="{w}" height="{h}"/><hp:curSz width="{w}" height="{h}"/>'
@@ -44,7 +47,7 @@ def picture_xml(pic_id: int, z_order: int, bin_id: int, w: int, h: int) -> str:
             '<hc:rotMatrix e1="1" e2="0" e3="0" e4="0" e5="1" e6="0"/></hp:renderingInfo>'
             f'<hc:img binaryItemIDRef="image{bin_id}" bright="0" contrast="0" effect="REAL_PIC" alpha="0"/>'
             f'<hp:imgRect><hc:pt0 x="0" y="0"/><hc:pt1 x="{w}" y="0"/><hc:pt2 x="{w}" y="{h}"/><hc:pt3 x="0" y="{h}"/></hp:imgRect>'
-            f'<hp:imgClip left="0" right="{w}" top="0" bottom="{h}"/>'
+            f'<hp:imgClip left="0" right="{cw}" top="0" bottom="{ch}"/>'
             f'<hp:sz width="{w}" widthRelTo="ABSOLUTE" height="{h}" heightRelTo="ABSOLUTE" protect="0"/>'
             '<hp:pos treatAsChar="1" affectLSpacing="0" flowWithText="1" allowOverlap="0" holdAnchorAndSO="0" '
             'vertRelTo="PARA" horzRelTo="PARA" vertAlign="TOP" horzAlign="LEFT" vertOffset="0" horzOffset="0"/>'
@@ -62,7 +65,7 @@ class _Ctx:
     def picture(self, p: Picture) -> str:
         n = self.n_pic
         self.n_pic += 1
-        return picture_xml(PIC_ID_BASE + n, PIC_Z_BASE + n, p.bin_id, p.width, p.height)
+        return picture_xml(PIC_ID_BASE + n, PIC_Z_BASE + n, p.bin_id, p.width, p.height, p.org_w, p.org_h)
 
     def equation(self, script: str) -> str:
         n = self.n_eq

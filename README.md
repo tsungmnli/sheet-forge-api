@@ -87,21 +87,23 @@ curl http://127.0.0.1:8000/readyz       # readiness. 템플릿 로드 여부를 
 hwpx 파일을 바로 받으려면 `format=hwpx`를 붙입니다. 요약은 응답 헤더(`X-Export-Status` 등)에 담깁니다.
 
 ```bash
-curl -X POST "http://127.0.0.1:8000/v1/exports?format=hwpx" \
+curl -X POST "http://127.0.0.1:8000/exports?format=hwpx" \
   -H "Content-Type: application/json" --data @request.json -o out.hwpx
 ```
 
 PowerShell에서는 `curl`이 `Invoke-WebRequest`의 별칭이라 `curl.exe`로 써야 합니다.
 
-`format`을 생략하면 리포트와 파일(base64)이 한 JSON 응답으로 옵니다. 쪽 설정으로 계산된 본문 폭과 단 폭만 확인하려면 `POST /v1/exports/layout-preview`, 기본 preset은 `GET /v1/export-presets/defaults`로 볼 수 있습니다.
+`format`을 생략하면 리포트와 파일(base64)이 한 JSON 응답으로 옵니다. 쪽 설정으로 계산된 본문 폭과 단 폭만 확인하려면 `POST /api/exports/layout-preview`, 기본 preset은 `GET /api/export-presets/defaults`로 볼 수 있습니다.
 
 ### 엔드포인트
 
+경로는 외부(Ingress) 기준으로 `/api/...`로 적었습니다. Ingress가 `/api`를 떼고 앱은 접두어 없이 서비스하므로, 로컬에서 uvicorn에 직접 호출할 때는 `/api`를 뺍니다(예: `/exports`).
+
 | 메서드·경로 | 설명 |
 | --- | --- |
-| `POST /v1/exports` | hwpx 내보내기. 기본은 JSON(리포트 + base64 파일), `?format=hwpx`는 바이너리 |
-| `POST /v1/exports/layout-preview` | preset으로 계산한 본문 폭·단 폭 |
-| `GET /v1/export-presets/defaults` | 기본 preset과 용지 후보 |
+| `POST /api/exports` | hwpx 내보내기. 기본은 JSON(리포트 + base64 파일), `?format=hwpx`는 바이너리 |
+| `POST /api/exports/layout-preview` | preset으로 계산한 본문 폭·단 폭 |
+| `GET /api/export-presets/defaults` | 기본 preset과 용지 후보 |
 | `GET /healthz`, `GET /readyz` | liveness, readiness |
 
 오류는 `{ "error": { "code", "message", "details" } }` 형식입니다. 문항 단위의 문제(그림 누락 등)는 오류가 아니라 200 응답의 `report`에 담기고, 내보낼 수 없는 경우(잘못된 preset, 내보낼 문항 없음 등)만 4xx/5xx입니다. 자세한 매핑은 `docs/export-api-design.md` 5장에 있습니다.
@@ -124,7 +126,12 @@ PowerShell에서는 `curl`이 `Invoke-WebRequest`의 별칭이라 `curl.exe`로 
 | `SHEET_FORGE_DATABASE_URL_RO` | (비어 있음) | 내보내기용 읽기 계정 주소. 비어 있으면 위 주소를 씀 |
 | `SHEET_FORGE_DB_POOL_SIZE` | 5 | 연결 풀 크기 |
 | `SHEET_FORGE_DB_CONNECT_TIMEOUT_S` | 3 | DB 연결 제한 시간(초) |
-| `SHEET_FORGE_DEFAULT_OWNER_ID` | owner_default | 인증 전 단일 소유자 |
+| `SHEET_FORGE_DEFAULT_OWNER_ID` | owner_default | 로그인을 끈 동안의 단일 소유자. 첫 가입자는 이 id를 이어받아 기존 데이터를 그대로 쓴다 |
+| `SHEET_FORGE_AUTH_REQUIRED` | (꺼짐) | 1이면 로그인 세션이 있어야 API를 씀. **운영에서는 켠다** |
+| `SHEET_FORGE_SESSION_TTL_DAYS` | 30 | 로그인 유지 기간(쓸수록 늘어남) |
+| `SHEET_FORGE_COOKIE_SECURE` | true | 세션 쿠키 Secure. http로 로컬 개발할 때만 false |
+| `SHEET_FORGE_WEB_BASE_URL` | (비어 있음) | 메일 링크의 앞부분(웹 주소, 끝에 `/` 없이) |
+| `SHEET_FORGE_SMTP_HOST` / `_PORT` / `_USER` / `_PASSWORD` / `_FROM` | (비어 있음) | 메일 발송(Resend: `smtp.resend.com`, 465, `resend`, API 키). 호스트가 없으면 보내지 않고 링크를 로그에 남김 |
 | `SHEET_FORGE_MINIO_ENDPOINT` | (비어 있음) | MinIO `호스트:포트`. 비어 있으면 사진 API는 503 |
 | `SHEET_FORGE_MINIO_ACCESS_KEY` / `_SECRET_KEY` | (비어 있음) | MinIO 접근 키 |
 | `SHEET_FORGE_MINIO_BUCKET` | sheet-forge | 버킷 이름(없으면 처음 쓸 때 만듦) |
@@ -167,7 +174,7 @@ uv run alembic upgrade head
 
 ### 시험지·사진 API와 작업자 (B1)
 
-- API: `/v1/exams`(CRUD, 수정은 `If-Match`), `/v1/exams/{id}/pages`(업로드는 multipart 필드 이름 `files`, 여러 장), `/v1/pages/{id}`, `/v1/images/{ref}`. 사진은 MinIO에 두고 DB에는 참조(`img_…`)만 둡니다. 자동 생성 문서는 `/docs`, 스펙은 `/openapi.json`입니다.
+- API: `/api/exams`(CRUD, 수정은 `If-Match`), `/api/exams/{id}/pages`(업로드는 multipart 필드 이름 `files`, 여러 장), `/api/pages/{id}`, `/api/images/{ref}`. 사진은 MinIO에 두고 DB에는 참조(`img_…`)만 둡니다. 자동 생성 문서는 `/docs`, 스펙은 `/openapi.json`입니다.
 - 작업자: `python -m app.worker`(API와 같은 이미지, 실행 명령만 다름). `jobs` 테이블을 `FOR UPDATE SKIP LOCKED`로 가져가고, 실패하면 2번 지연 재시도한 뒤 사진을 `failed`로 표시합니다. 기본은 가짜 `PageProcessor`(고정 칸 6개)이고, `SHEET_FORGE_RECOGNITION_ENGINE=real`이면 실제 구현을 씁니다(아래 B5 절). 작업자에도 `.env`와 같은 DB·MinIO 설정이 필요합니다.
 - MinIO 설정이 없으면 사진 API만 503이고 시험지 API는 그대로 동작합니다. `/readyz`에는 `storage` 점검이 추가됩니다.
 - 요청 하나의 크기 제한은 `SHEET_FORGE_MAX_BODY_BYTES`(기본 32MB)입니다. 사진이 많으면 여러 요청으로 나눠 올립니다.
@@ -175,31 +182,31 @@ uv run alembic upgrade head
 
 ### 문제 칸·문제 API와 작업자 (B2)
 
-- **문제 칸**: `PATCH /v1/pages/{id}/segments/{sid}`(고르기/해제), `PUT /v1/pages/{id}/segments`(칸 전체 교체, `id`가 있는 칸은 유지), `POST /v1/exams/{id}/segments/mark`(한꺼번에 고르기/해제. 범위는 `segment_ids` 또는 `page_id`, 둘 다 없으면 시험지 전부이며 둘을 함께 보내면 422). 읽은 문제가 있는 칸은 해제·삭제할 수 없고 `409 SEGMENT_HAS_PROBLEM`입니다(`mark`는 해제하지 않고 `skipped`로 셉니다).
-- **읽기**: `POST /v1/exams/{id}/read`(202, 본문을 생략하면 읽지 않은 고른 칸 전부. 이미 읽은 칸은 건너뜀, 한 번에 `SHEET_FORGE_MAX_READ_BATCH`개까지), `GET /v1/exams/{id}/problems?state=`(고른 칸 목록이고 읽기 전 칸은 `not_read`). 하루 읽기 한도(`SHEET_FORGE_DAILY_READ_LIMIT`, 한국 시간 기준, 다시 읽기는 2배로 셈)를 넘으면 `429 READ_LIMIT`이고 일부만 읽히지 않습니다.
-- **문제**: `GET /v1/problems/{id}`(`ETag`), `PUT …/content`(자동 저장, `If-Match` 필수: 없으면 428, 낡았으면 412 `VERSION_CONFLICT`), `POST …/confirm`(`If-Match` 필수. 변환할 수 없는 수식이 있으면 `409 MATH_UNSUPPORTED`와 `details[{path, message}]`, 내용이 비었으면 `422 EMPTY_PROBLEM`), `POST …/reopen`·`…/revert`·`…/reread`(202), `DELETE`, `GET …/neighbors`. 상태는 `recognizing → needs_review ↔ confirmed`이고 읽기에 실패하면 `failed`입니다(그래도 직접 입력해 확인할 수 있습니다). 응답에는 항상 `hints`(여기부터 보세요)와 `checks`(확인 완료 가능 여부와 막는 이유)가 들어 있고 저장되지 않으며 읽을 때마다 계산합니다.
+- **문제 칸**: `PATCH /api/pages/{id}/segments/{sid}`(고르기/해제), `PUT /api/pages/{id}/segments`(칸 전체 교체, `id`가 있는 칸은 유지), `POST /api/exams/{id}/segments/mark`(한꺼번에 고르기/해제. 범위는 `segment_ids` 또는 `page_id`, 둘 다 없으면 시험지 전부이며 둘을 함께 보내면 422). 읽은 문제가 있는 칸은 해제·삭제할 수 없고 `409 SEGMENT_HAS_PROBLEM`입니다(`mark`는 해제하지 않고 `skipped`로 셉니다).
+- **읽기**: `POST /api/exams/{id}/read`(202, 본문을 생략하면 읽지 않은 고른 칸 전부. 이미 읽은 칸은 건너뜀, 한 번에 `SHEET_FORGE_MAX_READ_BATCH`개까지), `GET /api/exams/{id}/problems?state=`(고른 칸 목록이고 읽기 전 칸은 `not_read`). 하루 읽기 한도(`SHEET_FORGE_DAILY_READ_LIMIT`, 한국 시간 기준, 다시 읽기는 2배로 셈)를 넘으면 `429 READ_LIMIT`이고 일부만 읽히지 않습니다.
+- **문제**: `GET /api/problems/{id}`(`ETag`), `PUT …/content`(자동 저장, `If-Match` 필수: 없으면 428, 낡았으면 412 `VERSION_CONFLICT`), `POST …/confirm`(`If-Match` 필수. 변환할 수 없는 수식이 있으면 `409 MATH_UNSUPPORTED`와 `details[{path, message}]`, 내용이 비었으면 `422 EMPTY_PROBLEM`), `POST …/reopen`·`…/revert`·`…/reread`(202), `DELETE`, `GET …/neighbors`. 상태는 `recognizing → needs_review ↔ confirmed`이고 읽기에 실패하면 `failed`입니다(그래도 직접 입력해 확인할 수 있습니다). 응답에는 항상 `hints`(여기부터 보세요)와 `checks`(확인 완료 가능 여부와 막는 이유)가 들어 있고 저장되지 않으며 읽을 때마다 계산합니다.
 - **그림**: `POST …/figures`(202), `PUT …/figures/{fid}/region`(202), `DELETE …/figures/{fid}`. 크롭·정리는 작업자가 하고 그림 `state`는 `processing → ready`(실패하면 `failed`)입니다. 정리만 실패하면 원본 그림을 씁니다(`use="raw"`). 그림은 서버가 관리하므로 본문 저장에서는 `use`·`placement`·`width_mm`만 바꿀 수 있고, 모르는 그림이나 남의 `ref`는 `422 FIGURE_REF_INVALID`입니다.
-- **수식 점검**: `POST /v1/math/check`(요청당 200개, DB 없음, 한글 수식 스크립트는 돌려주지 않고 `status`·`message`·`est_width`만).
+- **수식 점검**: `POST /api/math/check`(요청당 200개, DB 없음, 한글 수식 스크립트는 돌려주지 않고 `status`·`message`·`est_width`만).
 - **작업자**: `problem_read`·`problem_reread`·`figure_clean`을 처리합니다. 읽는 사이 문제가 지워지거나 상태가 바뀌면 결과를 버리고 만들던 크롭 이미지를 정리하며, 마지막 시도까지 실패하면 `failed`로 표시합니다. 기본은 가짜 `Recognizer`(고정 문제)와 가짜 `FigureCleaner`(정리 없음)이고, `SHEET_FORGE_RECOGNITION_ENGINE=real`이면 실제 구현을 씁니다(아래 B5 절). `recognized`(되돌리기 기준)는 기계가 읽을 때마다 덮어씁니다(다시 읽기 결과가 새 기준).
 - **DB**: 마이그레이션 `0003`(`problems`, `read_usage`). 한 칸에 살아 있는 문제는 하나입니다(부분 유니크 인덱스).
 
 ### 문제지·저장된 모양 API (B3 완료)
 
-- **문제지**: `POST/GET /v1/worksheets`, `GET/PATCH/DELETE /v1/worksheets/{id}`, `PUT/POST /v1/worksheets/{id}/problems`, `POST …/duplicate`. `from_exam_id`로 만들면 그 시험지의 확인 완료 문제를 사진 순서대로 담고 학생을 이어받습니다. `PATCH`·`PUT problems`는 `If-Match` 필수(428·412), 뒤에 추가하는 `POST problems`는 필요 없지만 `version`은 올라갑니다. 담을 수 있는 문제 수는 `SHEET_FORGE_MAX_PROBLEMS`(413 `TOO_MANY_PROBLEMS`).
+- **문제지**: `POST/GET /api/worksheets`, `GET/PATCH/DELETE /api/worksheets/{id}`, `PUT/POST /api/worksheets/{id}/problems`, `POST …/duplicate`. `from_exam_id`로 만들면 그 시험지의 확인 완료 문제를 사진 순서대로 담고 학생을 이어받습니다. `PATCH`·`PUT problems`는 `If-Match` 필수(428·412), 뒤에 추가하는 `POST problems`는 필요 없지만 `version`은 올라갑니다. 담을 수 있는 문제 수는 `SHEET_FORGE_MAX_PROBLEMS`(413 `TOO_MANY_PROBLEMS`).
 - **번호**: 서버가 계산합니다. 삭제된 문제는 번호가 없고, `unconfirmed_policy="skip"`이면 확인 안 끝난 문제도 번호가 없습니다(`fail`이면 번호가 붙음). 내보내기와 같은 규칙입니다.
 - **모양**: 문제지는 모양(preset)을 값으로 복사해 갖습니다. `PATCH`에 `preset`(값) 또는 `preset_id`(저장된 모양, 둘 중 하나)를 보내며, 잘못된 값은 422 `PRESET_INVALID`입니다. 응답의 `layout`은 본문 폭·칸 폭입니다.
-- **저장된 모양**: `GET/POST /v1/export-presets`, `PUT/DELETE /v1/export-presets/{id}`(`PUT`은 `If-Match`). 내장 모양 `builtin_a4_1col`("A4 한 칸"), `builtin_b5_2col`("B5 두 칸", 182×257mm)은 코드 상수라 고치거나 지울 수 없습니다(409 `PRESET_BUILTIN`).
-- **문제 검색**: `GET /v1/problems?status=&student=&exam_id=&q=&worksheet_id=`(기본은 확인 완료). `worksheet_id`를 주면 이미 담긴 문제에 `in_worksheet`가 표시됩니다. `q`는 부분 일치(`ilike`)이고 `pg_trgm` 인덱스는 아직 없습니다.
-- **점검**: `GET /v1/worksheets/{id}/check`. 파일을 만들지 않고 `ready`와 항목(`EMPTY_EXPORT`·`UNCONFIRMED_BLOCKS`·`PRESET_INVALID`는 오류, `UNCONFIRMED`·`DELETED`·`FIGURE_MISSING`은 경고)을 돌려줍니다.
+- **저장된 모양**: `GET/POST /api/export-presets`, `PUT/DELETE /api/export-presets/{id}`(`PUT`은 `If-Match`). 내장 모양 `builtin_a4_1col`("A4 한 칸"), `builtin_b5_2col`("B5 두 칸", 182×257mm)은 코드 상수라 고치거나 지울 수 없습니다(409 `PRESET_BUILTIN`).
+- **문제 검색**: `GET /api/problems?status=&student=&exam_id=&q=&worksheet_id=`(기본은 확인 완료). `worksheet_id`를 주면 이미 담긴 문제에 `in_worksheet`가 표시됩니다. `q`는 부분 일치(`ilike`)이고 `pg_trgm` 인덱스는 아직 없습니다.
+- **점검**: `GET /api/worksheets/{id}/check`. 파일을 만들지 않고 `ready`와 항목(`EMPTY_EXPORT`·`UNCONFIRMED_BLOCKS`·`PRESET_INVALID`는 오류, `UNCONFIRMED`·`DELETED`·`FIGURE_MISSING`은 경고)을 돌려줍니다.
 - **DB**: 마이그레이션 `0004`(`worksheets`, `worksheet_items`, `export_presets`). 4단계에서 마이그레이션 변경은 없습니다.
-- **내보내기**: `POST /v1/worksheets/{id}/export?format=json|hwpx`. 문제지에 담긴 문제를 담은 순서대로 읽고(삭제된 문제는 제외) 그림은 이미지 저장소에서 가져와 hwpx를 만듭니다. 응답은 `POST /v1/exports`와 같습니다(JSON은 리포트 + base64 파일, `hwpx`는 바이너리와 `X-Export-*` 헤더). 문제 읽기는 읽기 전용 세션, 성공한 뒤 `last_export {at, name, status}` 기록은 쓰기 세션이 하며 `version`·`updated_at`은 올리지 않습니다. 문제지의 `unconfirmed_policy`가 모양의 `on_unconfirmed`보다 우선합니다. `skip`이면 확인 안 된 문제는 `NOT_CONFIRMED` 경고와 함께 빠지고 번호도 건너뛰며, `fail`이면 409 `NOT_CONFIRMED`입니다. 담긴 문제가 없으면 422 `EMPTY_EXPORT`, 문제·그림 수 한도를 넘으면 413입니다. 리포트 항목에 `problem_id`가 있으면 `link {exam_id, problem_id}`를 붙입니다. 그림을 못 찾거나 불러오지 못하면 그 문제는 빠지고 리포트로 알립니다. 파일은 보관하지 않습니다. 문제지 `header`(이름란·날짜란 등)는 아직 파일에 반영하지 않습니다.
+- **내보내기**: `POST /api/worksheets/{id}/export?format=json|hwpx`. 문제지에 담긴 문제를 담은 순서대로 읽고(삭제된 문제는 제외) 그림은 이미지 저장소에서 가져와 hwpx를 만듭니다. 응답은 `POST /api/exports`와 같습니다(JSON은 리포트 + base64 파일, `hwpx`는 바이너리와 `X-Export-*` 헤더). 문제 읽기는 읽기 전용 세션, 성공한 뒤 `last_export {at, name, status}` 기록은 쓰기 세션이 하며 `version`·`updated_at`은 올리지 않습니다. 문제지의 `unconfirmed_policy`가 모양의 `on_unconfirmed`보다 우선합니다. `skip`이면 확인 안 된 문제는 `NOT_CONFIRMED` 경고와 함께 빠지고 번호도 건너뛰며, `fail`이면 409 `NOT_CONFIRMED`입니다. 담긴 문제가 없으면 422 `EMPTY_EXPORT`, 문제·그림 수 한도를 넘으면 413입니다. 리포트 항목에 `problem_id`가 있으면 `link {exam_id, problem_id}`를 붙입니다. 그림을 못 찾거나 불러오지 못하면 그 문제는 빠지고 리포트로 알립니다. 파일은 보관하지 않습니다. 문제지 `header`(이름란·날짜란 등)는 아직 파일에 반영하지 않습니다.
 
 ### 휴지통·설정·홈·정기 정리 (B4 완료)
 
-- **삭제와 휴지통**: 시험지·사진을 지우면 그 안의 문제도 `deleted_with`로 묶어 휴지통에 보냅니다(목록·검색·문제지에서 빠짐). `GET /v1/trash?type=`는 시험지·사진·문제·문제지 목록과 `purge_at`(30일 뒤)을 줍니다.
-- **복구**: `POST /v1/trash/{type}/{id}/restore`. 같이 지운 것만 복구하고, 부모가 휴지통에 있으면 409 `PARENT_IN_TRASH`입니다. 따로 지운 문제는 그대로 둡니다.
-- **내 설정**: `GET /v1/me`, `GET`·`PATCH /v1/me/settings`. 잘못된 값은 422입니다. `student_name_display`는 `full`·`alias`·`masked`, 원본 사진 보존 기간은 7·30·90일과 계속 보관입니다. 마이그레이션 `0005`(`user_settings`).
-- **홈**: `GET /v1/home`(상태별 할 일 수와 `next_problem`), `GET /v1/students`.
+- **삭제와 휴지통**: 시험지·사진을 지우면 그 안의 문제도 `deleted_with`로 묶어 휴지통에 보냅니다(목록·검색·문제지에서 빠짐). `GET /api/trash?type=`는 시험지·사진·문제·문제지 목록과 `purge_at`(30일 뒤)을 줍니다.
+- **복구**: `POST /api/trash/{type}/{id}/restore`. 같이 지운 것만 복구하고, 부모가 휴지통에 있으면 409 `PARENT_IN_TRASH`입니다. 따로 지운 문제는 그대로 둡니다.
+- **내 설정**: `GET /api/me`, `GET`·`PATCH /api/me/settings`. 잘못된 값은 422입니다. `student_name_display`는 `full`·`alias`·`masked`, 원본 사진 보존 기간은 7·30·90일과 계속 보관입니다. 마이그레이션 `0005`(`user_settings`).
+- **홈**: `GET /api/home`(상태별 할 일 수와 `next_problem`), `GET /api/students`.
 - **정기 정리**: 작업자가 `purge_trash`(30일 지난 항목과 이미지 영구 삭제)와 `purge_originals`(원본 사진만 보존 기간 뒤 삭제, 기본 30일, 사용자 설정이 우선)를 실행합니다. 원본이 없으면 보정 다시 하기는 409 `ORIGINAL_EXPIRED`입니다. 로그에는 종류별 개수만 남깁니다.
   - 시작 직후 한 번, 그 뒤 `SHEET_FORGE_MAINTENANCE_INTERVAL_S`마다 실행합니다. 실패해도 오류 종류만 로그에 남기고 작업 처리는 계속합니다.
   - 작업자가 여러 개면 각자 실행합니다. 지우는 조건이 겹치지 않고 두 번 실행해도 결과가 같아 잠금은 없습니다.
@@ -219,6 +226,36 @@ uv run alembic upgrade head
 - **개인정보·로그**: `real`일 때 분할에서는 보정한 사진의 축소본(긴 변 `SEGMENT_IMAGE_LONG_SIDE`)이, 읽기에서는 문제 크롭이 외부 LLM 공급자로 나갑니다. 로그에는 종류·모델·예외 이름만 남깁니다.
 - **임시로 정한 것**(설계에 값이 없음): 한도를 `read_usage`로 세는 것, 읽기가 LLM 호출 전에 실패해도 센 한도를 돌려주지 않는 것, 사용량을 별도 트랜잭션으로 기록하는 것, 계측 항목 4종과 그림 제외, 분할이 알려 준 선택지·그림 영역을 아직 저장하지 않는 것(`SegmentDraft`에 담기만 함).
 - **알려 둘 것**: `REREAD_MODEL` 기본값 `gemini-3.8-flash`는 2027-01-01부터 가격이 두 배가 됩니다(설계 문서 실측 기준). 그 전에 `usage_events`로 사용량을 보고 모델을 정하세요.
+
+### 스펙 점검 (웹 생성 도구에 넘기기 전)
+
+- `uv run python scripts/export_openapi.py`가 `smoke/openapi.json`을 저장하고, 저장한 뒤 점검 결과를 화면에 출력합니다(스펙 파일은 바꾸지 않습니다): 성공 응답 모양이 없는 동작, 모양이 정해지지 않은 `object` 필드, 60자를 넘는 `operationId`. 머리글 잔재를 찾는 `"header"` 검사는 `If-Match` 헤더 파라미터(`"in": "header"`)도 잡으므로 6곳이 나오는 것이 정상입니다.
+- **`preset` 모양**: 요청·응답의 `preset`은 값이 여전히 `dict`이고 검증은 `ExportPreset.from_dict`가 하지만, 스펙에는 `ExportPreset`의 항목 이름과 종류가 보입니다(`app/api/preset_shape.py`의 `PresetValue`는 일부만 보내도 되는 요청용, `PresetValueOut`은 모든 항목이 있는 응답용). 스펙 용량이 그만큼(약 40KB) 늘었습니다. 모양을 만들다 실패하면 예전처럼 `object`로 보이고 앱은 그대로 뜹니다.
+- **일부러 열어 둔 `object`**: `stats`, `layout`, `last_export`, `restored`, `correction`, `images`(`ExportRequestBody.images`, 참조→base64 PNG 대응표)는 화면에서 읽기만 하거나 자유 형식이라 모양을 지정하지 않았습니다. `ValidationError.ctx`는 FastAPI 기본 스키마입니다.
+- **`operationId`**: FastAPI가 `함수이름_경로_메서드`로 자동 생성하므로 60자를 넘는 `duplicate_worksheet`만 `operation_id="duplicate_worksheet"`로 지정했습니다.
+
+### 로그인 (초대 가입)
+
+가입은 초대로만 합니다. 이메일 주소에 초대 메일을 보내면, 받은 사람이 링크에서 비밀번호를 정해 가입하고 바로 로그인합니다. 링크가 그 이메일로 도착했다는 것이 이메일 확인을 대신합니다. 비밀번호 재설정도 같은 방식의 메일 링크입니다.
+
+- 엔드포인트: `GET /auth/invite?token=`(가입 화면에 이메일 표시, 링크를 쓰지 않음), `POST /auth/invite/accept`, `POST /auth/login`, `POST /auth/logout`, `POST /auth/password/forgot`(가입 여부와 상관없이 204), `POST /auth/password/reset`(모든 기기 로그아웃). 비밀번호는 8~128자입니다.
+- 로그인하면 httpOnly 쿠키 `sid`가 생깁니다(`SameSite=Lax`, 기본 `Secure`). 서버 세션은 쓸수록 만료가 늘어나(기본 30일) 매일 쓰는 사람은 계속 로그인된 상태입니다. 쿠키 수명은 400일로 길게 두고 만료는 서버 세션이 정합니다.
+- `SHEET_FORGE_AUTH_REQUIRED`가 꺼져 있으면(기본) 로그인 없이 `default_owner_id` 한 명으로 동작합니다(로컬 개발·테스트). 켜면 `current_user`가 세션에서 사용자를 찾고, 없으면 401 `NOT_AUTHENTICATED`입니다. `/healthz`, `/readyz`와 `/auth/*`는 로그인 없이 열려 있습니다.
+- 첫 가입자의 `users.id`는 `default_owner_id`가 되어 그전에 쌓인 시험지·문제·설정을 그대로 이어받습니다.
+
+```bash
+uv run python scripts/invite.py 선생님@example.com        # 초대 메일 보내기(SMTP가 없으면 링크만 출력)
+uv run python scripts/reset_password.py 선생님@example.com # 메일 재설정을 못 쓸 때 직접 바꾸기
+```
+
+두 스크립트는 `.env`(또는 환경 변수)의 DB 주소와 SMTP 설정을 씁니다. 운영 DB에 초대하려면 그 주소와 설정이 들어 있어야 하며, 이미지에는 `scripts/`가 들어 있지 않습니다. 운영에 처음 켜는 순서는 다음과 같습니다.
+
+1. Resend에서 보내는 도메인을 인증하고 API 키를 만듭니다. `SMTP_FROM`은 인증한 도메인 주소여야 합니다.
+2. 클러스터에 `SMTP_PASSWORD`(Secret), `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_FROM`, `WEB_BASE_URL`을 넣습니다.
+3. `alembic upgrade head`(0009)를 실행한 뒤 `scripts/invite.py`로 첫 선생님을 초대하고, 링크로 가입을 마칩니다.
+4. 가입을 확인한 뒤 `SHEET_FORGE_AUTH_REQUIRED=1`을 켭니다.
+
+아직 없는 것: 로그인 시도 제한(계정이 한 명이라 뺐고, 사용자가 늘면 추가), 만료된 세션 정리, Google·카카오 로그인.
 
 ### 테스트
 
@@ -241,6 +278,7 @@ uv run pytest
 | `test_b3_tools.py` | 문제 검색, 문제지 점검 |
 | `test_b3_export.py` | 문제지 내보내기(JSON·hwpx, `last_export`, 오류), 저장소 이미지 어댑터, 리포트 `link` |
 | `test_b4_*.py` | 휴지통·복구·설정·홈·정기 정리(`test_b4_maintenance.py`: 보존 기간과 영구 삭제) |
+| `test_auth.py` | 비밀번호 해시, 초대 가입, 로그인·로그아웃, 세션 연장·만료, 비밀번호 재설정(DB 통합은 환경 변수 있을 때) |
 
 수식 변환 테스트는 `tests/fixtures/math_gallery_v*_results.json`(한글에서 직접 측정한 결과)을 기준으로 합니다.
 
@@ -280,9 +318,8 @@ docker run --rm -p 8000:8000 sheet-forge-api
 
 ## 알려진 제한
 
-- 외부에 공개하기 전에 인증이 필요합니다(앞단 인증 권장). 현재 API 자체에는 인증이 없습니다.
+- 로그인은 `SHEET_FORGE_AUTH_REQUIRED=1`일 때만 걸립니다(기본은 꺼짐). 외부에 공개하기 전에 반드시 켜세요(위 "로그인" 참고).
 - 굵게·밑줄 같은 텍스트 서식은 내보내지 않고 리포트로만 알립니다.
-- 문제지 `header`(이름란·날짜란 등)는 내보낸 파일에 아직 반영되지 않습니다.
 - 선택지 마커는 ①~⑤까지, `<보기>`와 표가 들어간 문항은 지원하지 않습니다.
 - 수식 크기 지정 방식은 한 가지 한글 버전에서 확인한 규칙을 따릅니다. 다른 버전에서의 호환은 확인이 더 필요합니다.
 - 읽기는 외부 LLM 결과라 사진에 없는 글이 들어가거나 글자가 빠질 수 있습니다. 그래서 선생님이 보고 고친 뒤 확인하는 흐름입니다.

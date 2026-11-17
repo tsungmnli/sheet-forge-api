@@ -37,6 +37,7 @@ READ_SCHEMA = {
             "properties": {"where": {"type": "string"}, "reason": {"type": "string"}},
             "required": ["where", "reason"]}},
         "unsupported_block": {"type": "string", "nullable": True},
+        "points": {"type": "number", "nullable": True},   # 인쇄된 배점 숫자("[4점]" -> 4). 없으면 null
     },
-    "required": ["stem", "choices", "figures", "uncertain", "unsupported_block"],
+    "required": ["stem", "choices", "figures", "uncertain", "unsupported_block", "points"],
 }

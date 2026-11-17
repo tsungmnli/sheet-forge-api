@@ -12,15 +12,15 @@ class MaintenanceTest(_Base):
         exam_id, _, _ = self._exam(1)
         keep, _, _ = self._exam(0, title="남길 시험지")
         before = set(self.store.objects)
-        self.assertEqual(self.c.delete(f"/v1/exams/{exam_id}").status_code, 204)
+        self.assertEqual(self.c.delete(f"/exams/{exam_id}").status_code, 204)
         now = datetime.now(timezone.utc)
         res = run_maintenance(self.db, self.store, 30, now + timedelta(days=10))      # 아직 보존 기간 안
         self.assertEqual(res["trash"]["counts"]["exam"], 0)
         self.assertEqual(set(self.store.objects), before)
         res = run_maintenance(self.db, self.store, 30, now + timedelta(days=31))      # 보존 기간이 지남
         self.assertEqual(res["trash"]["counts"]["exam"], 1)
-        self.assertEqual(self.c.get("/v1/trash").json()["items"], [])
-        self.assertEqual(self.c.get(f"/v1/exams/{keep}").status_code, 200)            # 살아 있는 시험지는 그대로
+        self.assertEqual(self.c.get("/trash").json()["items"], [])
+        self.assertEqual(self.c.get(f"/exams/{keep}").status_code, 200)            # 살아 있는 시험지는 그대로
         self.assertEqual(res["originals"]["pages"], 0)                                  # 가짜 처리기 사진(보정본=원본)은 건너뜀
 
 

@@ -23,11 +23,15 @@ class Equation:
 
 @dataclass
 class Picture:
-    """문단 안의 그림 조각(hp:pic). width·height는 표시 크기(HWPUNIT). bin_id는 내보낼 때 문서 순서로 부여."""
+    """문단 안의 그림 조각(hp:pic). width·height는 표시 크기(HWPUNIT). bin_id는 내보낼 때 문서 순서로 부여.
+    org_w·org_h는 이미지 원본 크기(픽셀 × PX_HWP). 한글이 imgClip을 이 크기 기준으로 해석하므로 필요하다.
+    0이면 표시 크기를 쓴다."""
     png: bytes
     width: int
     height: int
     bin_id: int = 0
+    org_w: int = 0
+    org_h: int = 0
 
 
 class Tab:
@@ -249,7 +253,7 @@ def _figure_picture(fig: dict, k: int, pid, report: ExportReport, layout, images
         avail = page_h - layout.top - layout.bottom - layout.header - layout.footer
         if h > avail:
             report.add("FIGURE_TALL", "warn", f"그림 높이 {h}가 쪽에서 쓸 수 있는 높이 {avail}(추정)를 넘음", pid, where)
-    return Picture(img.png, w, h)
+    return Picture(img.png, w, h, 0, img.width_px * PX_HWP, img.height_px * PX_HWP)
 
 
 def blank_paragraph() -> ParagraphSpec:

@@ -1,24 +1,36 @@
 """내 정보·설정 (REST 설계 5.9)."""
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from sqlalchemy.orm import Session
 
 from .. import me_service as svc
-from ..deps import current_user, get_session
+from ...db.models import User
+from ..deps import current_user, get_db, get_session, get_settings
+from ..schemas_home import MeOut, SettingsOut
 
-router = APIRouter(prefix="/v1")
-
-
-@router.get("/me")
-def get_me(owner: str = Depends(current_user)):
-    return svc.me(owner)
+router = APIRouter()
 
 
-@router.get("/me/settings")
+@router.get("/me", response_model=MeOut, response_model_exclude_none=True,
+            responses={401: {"description": "로그인 필요 (NOT_AUTHENTICATED)"}})
+def get_me(request: Request, owner: str = Depends(current_user), settings=Depends(get_settings)):
+    email = None
+    if settings.auth_required:   # 로그인을 끈 개발·테스트에서는 DB 없이 동작한다
+        s = get_db(request).session()
+        try:
+            user = s.get(User, owner)
+            email = user.email if user else None
+        finally:
+            s.close()
+    return svc.me(owner, email)
+
+
+@router.get("/me/settings", response_model=SettingsOut)
 def get_my_settings(owner: str = Depends(current_user), session: Session = Depends(get_session)):
     return svc.get_settings(session, owner)
 
 
-@router.patch("/me/settings")
+@router.patch("/me/settings", response_model=SettingsOut,
+              responses={422: {"description": "잘못된 설정 값 (REQUEST_INVALID)"}})
 def patch_my_settings(body: svc.SettingsPatch, owner: str = Depends(current_user), session: Session = Depends(get_session)):
     """바꿀 값만 보낸다(부분 수정). 잘못된 값은 422. 응답은 바뀐 뒤의 전체 설정."""
     return svc.patch_settings(session, owner, body)

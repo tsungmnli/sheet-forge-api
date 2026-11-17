@@ -13,7 +13,7 @@ from ..schemas import ExportRequestBody, LayoutPreviewBody
 from ..service import run_export, safe_filename
 from ..settings import Settings
 
-router = APIRouter(prefix="/v1")
+router = APIRouter()
 log = logging.getLogger("sheet_forge.api")
 HWPX_MEDIA = "application/vnd.hancom.hwpx"
 

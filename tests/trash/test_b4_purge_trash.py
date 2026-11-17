@@ -26,36 +26,36 @@ class PurgeTrashTest(_Base):
 
     def test_expired_exam_is_purged_with_children_and_leaves_worksheet(self):
         exam_id, _, ids = self._exam(2)
-        ws = self.c.post("/v1/worksheets", json={"title": "오답", "problem_ids": ids}).json()
-        self.assertEqual(self.c.delete(f"/v1/exams/{exam_id}").status_code, 204)
+        ws = self.c.post("/worksheets", json={"title": "오답", "problem_ids": ids}).json()
+        self.assertEqual(self.c.delete(f"/exams/{exam_id}").status_code, 204)
         self._age(31)
         res = self._purge()
         self.assertEqual((res["counts"]["exam"], res["counts"]["page"], res["counts"]["problem"]), (1, 1, 2))
         self.assertTrue(res["counts"]["segment"] >= 2)
         self.assertTrue(res["refs"])                                   # 지운 행이 쓰던 이미지 ref 후보
         self.assertEqual([self._count(t) for t in ("exams", "pages", "problems", "segments", "worksheet_items")], [0] * 5)
-        self.assertEqual(self.c.get(f"/v1/worksheets/{ws['id']}").json()["items"], [])   # 문제지는 남고 목록만 빠짐
+        self.assertEqual(self.c.get(f"/worksheets/{ws['id']}").json()["items"], [])   # 문제지는 남고 목록만 빠짐
         self.assertEqual(self._purge()["counts"], {"problem": 0, "segment": 0, "page": 0, "exam": 0, "worksheet": 0})   # 멱등
 
     def test_not_expired_is_kept(self):
         exam_id, _, ids = self._exam(1)
-        ws = self.c.post("/v1/worksheets", json={"title": "오답"}).json()
-        self.assertEqual(self.c.delete(f"/v1/exams/{exam_id}").status_code, 204)
-        self.assertEqual(self.c.delete(f"/v1/worksheets/{ws['id']}").status_code, 204)
+        ws = self.c.post("/worksheets", json={"title": "오답"}).json()
+        self.assertEqual(self.c.delete(f"/exams/{exam_id}").status_code, 204)
+        self.assertEqual(self.c.delete(f"/worksheets/{ws['id']}").status_code, 204)
         self._age(29)
         self.assertEqual(sum(self._purge()["counts"].values()), 0)
-        self.assertEqual(len(self.c.get("/v1/trash").json()["items"]), 2)
+        self.assertEqual(len(self.c.get("/trash").json()["items"]), 2)
 
     def test_individually_deleted_problem_and_worksheet(self):
         exam_id, _, ids = self._exam(2)
-        ws = self.c.post("/v1/worksheets", json={"title": "오답", "problem_ids": ids}).json()
-        self.assertEqual(self.c.delete(f"/v1/problems/{ids[0]}").status_code, 204)
+        ws = self.c.post("/worksheets", json={"title": "오답", "problem_ids": ids}).json()
+        self.assertEqual(self.c.delete(f"/problems/{ids[0]}").status_code, 204)
         self._age(31)
         self.assertEqual(self._purge()["counts"]["problem"], 1)
-        items = self.c.get(f"/v1/worksheets/{ws['id']}").json()["items"]
+        items = self.c.get(f"/worksheets/{ws['id']}").json()["items"]
         self.assertEqual([i["problem_id"] for i in items], [ids[1]])
-        self.assertEqual(self.c.get(f"/v1/problems/{ids[1]}").status_code, 200)       # 살아 있는 문제는 그대로
-        self.assertEqual(self.c.delete(f"/v1/worksheets/{ws['id']}").status_code, 204)
+        self.assertEqual(self.c.get(f"/problems/{ids[1]}").status_code, 200)       # 살아 있는 문제는 그대로
+        self.assertEqual(self.c.delete(f"/worksheets/{ws['id']}").status_code, 204)
         self._age(31)
         self.assertEqual(self._purge()["counts"]["worksheet"], 1)
         self.assertEqual(self._count("worksheets"), 0)

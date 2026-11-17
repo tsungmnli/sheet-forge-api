@@ -96,7 +96,6 @@ class Worksheet(CommonColumns, Base):
     title: Mapped[str] = mapped_column(String(200), nullable=False, default="", server_default="")
     student: Mapped[str] = mapped_column(String(100), nullable=False, default="", server_default="")
     preset: Mapped[dict] = mapped_column(JSONB, nullable=False)    # 선택한 시점의 값 복사(REST 5.8)
-    header: Mapped[dict] = mapped_column(JSONB, nullable=False)
     unconfirmed_policy: Mapped[str] = mapped_column(String(8), nullable=False, default="skip", server_default="skip")
     last_export: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     __table_args__ = (Index("ix_worksheets_owner_updated", "owner_id", "updated_at"),)
@@ -143,3 +142,36 @@ class UsageEvent(Base):
     thinking_tokens: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
     latency_ms: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
     __table_args__ = (Index("ix_usage_events_created_at", "created_at"),)
+
+
+class User(Base):
+    """로그인 계정. id는 owner_id와 같다. 첫 가입자는 기존 데이터를 이어받도록 default_owner_id를 id로 쓴다."""
+    __tablename__ = "users"
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    email: Mapped[str] = mapped_column(String(320), nullable=False, unique=True)  # 소문자로만 저장·비교
+    password_hash: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+
+class AuthSession(Base):
+    """로그인 세션. 브라우저는 무작위 토큰을, DB는 그 해시만 가진다. 쓸 때마다 만료가 늘어난다(하루 한 번만 기록)."""
+    __tablename__ = "auth_sessions"
+    token_hash: Mapped[str] = mapped_column(String(64), primary_key=True)
+    user_id: Mapped[str] = mapped_column(String(64), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    last_used_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    user_agent: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    __table_args__ = (Index("ix_auth_sessions_user_id", "user_id"), Index("ix_auth_sessions_expires_at", "expires_at"))
+
+
+class EmailToken(Base):
+    """메일로 보내는 1회용 링크(초대 invite, 비밀번호 재설정 reset). 이메일 주소에 묶는다(초대 시점엔 계정이 아직 없다)."""
+    __tablename__ = "email_tokens"
+    token_hash: Mapped[str] = mapped_column(String(64), primary_key=True)
+    purpose: Mapped[str] = mapped_column(String(16), nullable=False)
+    email: Mapped[str] = mapped_column(String(320), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    __table_args__ = (Index("ix_email_tokens_email_purpose", "email", "purpose"),)

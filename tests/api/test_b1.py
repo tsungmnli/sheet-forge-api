@@ -77,13 +77,13 @@ class UnitTest(unittest.TestCase):
 
     def test_photo_api_is_503_without_store(self):
         c = TestClient(create_app(Settings()))
-        r = c.post("/v1/exams/exam_X/pages", files=[("files", ("a.png", make_png(), "image/png"))])
+        r = c.post("/exams/exam_X/pages", files=[("files", ("a.png", make_png(), "image/png"))])
         self.assertEqual((r.status_code, r.json()["error"]["code"]), (503, "STORAGE_UNAVAILABLE"))
 
     def test_openapi_builds(self):
         paths = create_app(Settings()).openapi()["paths"]
-        for p in ("/v1/exams", "/v1/exams/{exam_id}", "/v1/exams/{exam_id}/pages", "/v1/exams/{exam_id}/pages/order",
-                  "/v1/pages/{page_id}", "/v1/images/{ref}"):
+        for p in ("/exams", "/exams/{exam_id}", "/exams/{exam_id}/pages", "/exams/{exam_id}/pages/order",
+                  "/pages/{page_id}", "/images/{ref}"):
             self.assertIn(p, paths)
 
 
@@ -119,25 +119,25 @@ class FlowTest(unittest.TestCase):
         return TestClient(create_app(Settings(database_url=TEST_URL, default_owner_id=owner, **settings), store=self.store))
 
     def _exam(self, **body):
-        r = self.c.post("/v1/exams", json=body)
+        r = self.c.post("/exams", json=body)
         self.assertEqual(r.status_code, 201)
         return r.json()
 
     def _upload(self, exam_id, n=1, c=None):
         files = [("files", (f"p{i}.png", make_png(40, 30), "image/png")) for i in range(n)]
-        return (c or self.c).post(f"/v1/exams/{exam_id}/pages", files=files)
+        return (c or self.c).post(f"/exams/{exam_id}/pages", files=files)
 
     def _work(self, n):
         for _ in range(n):
             self.assertTrue(run_once(self.db, self.store, FakePageProcessor()))
 
     def test_exam_crud_and_optimistic_lock(self):
-        r = self.c.post("/v1/exams", json={})
+        r = self.c.post("/exams", json={})
         self.assertEqual(r.status_code, 201)
         e = r.json()
         self.assertEqual((e["title"], e["version"], e["next_action"], e["page_count"]), ("", 1, "upload", 0))
         self.assertEqual(r.headers["ETag"], '"1"')
-        url = f"/v1/exams/{e['id']}"
+        url = f"/exams/{e['id']}"
         self.assertEqual(self.c.patch(url, json={"title": "중간고사"}).status_code, 428)
         ok = self.c.patch(url, json={"title": "중간고사", "student": "민수"}, headers={"If-Match": '"1"'})
         self.assertEqual((ok.status_code, ok.json()["version"], ok.json()["title"]), (200, 2, "중간고사"))
@@ -145,18 +145,18 @@ class FlowTest(unittest.TestCase):
         self.assertEqual((stale.status_code, stale.json()["error"]["code"]), (412, "VERSION_CONFLICT"))
         self.assertEqual(self.c.patch(url, json={}, headers={"If-Match": '"2"'}).status_code, 422)
         self.assertEqual(self.c.get(url).json()["student"], "민수")
-        self.assertEqual(len(self.c.get("/v1/exams", params={"q": "중간"}).json()["items"]), 1)
-        self.assertEqual(len(self.c.get("/v1/exams", params={"student": "철수"}).json()["items"]), 0)
+        self.assertEqual(len(self.c.get("/exams", params={"q": "중간"}).json()["items"]), 1)
+        self.assertEqual(len(self.c.get("/exams", params={"student": "철수"}).json()["items"]), 0)
         self.assertEqual(self.c.delete(url).status_code, 204)
         self.assertEqual(self.c.get(url).status_code, 404)
-        self.assertEqual(self.c.get("/v1/exams").json()["items"], [])
+        self.assertEqual(self.c.get("/exams").json()["items"], [])
 
     def test_exam_list_pagination(self):
         ids = [self._exam(title=f"t{i}")["id"] for i in range(3)]
-        first = self.c.get("/v1/exams", params={"limit": 2}).json()
+        first = self.c.get("/exams", params={"limit": 2}).json()
         self.assertEqual(len(first["items"]), 2)
         self.assertIsNotNone(first["next_cursor"])
-        second = self.c.get("/v1/exams", params={"limit": 2, "cursor": first["next_cursor"]}).json()
+        second = self.c.get("/exams", params={"limit": 2, "cursor": first["next_cursor"]}).json()
         self.assertEqual(len(second["items"]), 1)
         self.assertIsNone(second["next_cursor"])
         self.assertEqual(sorted(i["id"] for i in first["items"] + second["items"]), sorted(ids))
@@ -169,27 +169,30 @@ class FlowTest(unittest.TestCase):
         self.assertEqual([p["order"] for p in body["items"]], [0, 1])
         self.assertEqual(body["items"][0]["processing"]["state"], "queued")
         self.assertEqual(body["poll_after_ms"], 2000)
-        exam = self.c.get(f"/v1/exams/{e['id']}").json()
+        exam = self.c.get(f"/exams/{e['id']}").json()
         self.assertEqual((exam["page_count"], exam["next_action"], exam["poll_after_ms"]), (2, "pick", 2000))
         self._work(2)
         self.assertFalse(run_once(self.db, self.store, FakePageProcessor()))
-        lst = self.c.get(f"/v1/exams/{e['id']}/pages")
+        lst = self.c.get(f"/exams/{e['id']}/pages")
         self.assertEqual([p["processing"]["state"] for p in lst.json()["items"]], ["done", "done"])
         self.assertIsNone(lst.json()["poll_after_ms"])
-        self.assertEqual(self.c.get(f"/v1/exams/{e['id']}/pages", headers={"If-None-Match": lst.headers["ETag"]}).status_code, 304)
+        self.assertEqual(self.c.get(f"/exams/{e['id']}/pages", headers={"If-None-Match": lst.headers["ETag"]}).status_code, 304)
         pid = lst.json()["items"][0]["id"]
-        detail = self.c.get(f"/v1/pages/{pid}").json()
+        detail = self.c.get(f"/pages/{pid}").json()
         self.assertEqual(len(detail["segments"]), 6)
         self.assertFalse(any(s["marked"] for s in detail["segments"]))
         self.assertEqual((detail["image"]["width"], detail["image"]["height"]), (40, 30))
         self.assertIsNotNone(detail["image"]["corrected_url"])
-        img = self.c.get(detail["image"]["original_url"])
+        # 응답의 URL은 바깥 접두어(/api)를 포함한다. Ingress가 떼므로 TestClient에서는 떼고 요청한다.
+        self.assertTrue(detail["image"]["original_url"].startswith("/api/images/"))
+        orig_path = detail["image"]["original_url"].removeprefix("/api")
+        img = self.c.get(orig_path)
         self.assertEqual((img.status_code, img.headers["content-type"], img.content), (200, "image/png", make_png(40, 30)))
-        self.assertEqual(self.c.get(detail["image"]["original_url"], headers={"If-None-Match": img.headers["ETag"]}).status_code, 304)
+        self.assertEqual(self.c.get(orig_path, headers={"If-None-Match": img.headers["ETag"]}).status_code, 304)
 
     def test_upload_validation(self):
         e = self._exam()
-        bad = self.c.post(f"/v1/exams/{e['id']}/pages", files=[("files", ("a.txt", b"hello not image", "text/plain"))])
+        bad = self.c.post(f"/exams/{e['id']}/pages", files=[("files", ("a.txt", b"hello not image", "text/plain"))])
         self.assertEqual((bad.status_code, bad.json()["error"]["code"]), (415, "PHOTO_UNSUPPORTED"))
         big = self._client(max_photo_bytes=10)
         r = self._upload(e["id"], c=big)
@@ -198,34 +201,34 @@ class FlowTest(unittest.TestCase):
         r = self._upload(e["id"], 2, c=few)
         self.assertEqual((r.status_code, r.json()["error"]["code"]), (422, "TOO_MANY_PAGES"))
         self.assertEqual(self._upload("exam_nope").status_code, 404)
-        self.assertEqual(self.c.get(f"/v1/exams/{e['id']}/pages").json()["items"], [])  # 실패한 업로드는 남지 않는다
+        self.assertEqual(self.c.get(f"/exams/{e['id']}/pages").json()["items"], [])  # 실패한 업로드는 남지 않는다
 
     def test_reorder_and_delete_page(self):
         e = self._exam()
         ids = [p["id"] for p in self._upload(e["id"], 3).json()["items"]]
-        url = f"/v1/exams/{e['id']}/pages/order"
+        url = f"/exams/{e['id']}/pages/order"
         r = self.c.put(url, json={"page_ids": list(reversed(ids))})
         self.assertEqual([p["id"] for p in r.json()["items"]], list(reversed(ids)))
         self.assertEqual(self.c.put(url, json={"page_ids": ids[:2]}).status_code, 422)
         self.assertEqual(self.c.put(url, json={"page_ids": ids + ids[:1]}).status_code, 422)
-        self.assertEqual(self.c.delete(f"/v1/pages/{ids[1]}").status_code, 204)
-        rest = self.c.get(f"/v1/exams/{e['id']}/pages").json()["items"]
+        self.assertEqual(self.c.delete(f"/pages/{ids[1]}").status_code, 204)
+        rest = self.c.get(f"/exams/{e['id']}/pages").json()["items"]
         self.assertEqual([p["id"] for p in rest], [ids[2], ids[0]])
         self.assertEqual([p["order"] for p in rest], [0, 1])
-        self.assertEqual(self.c.get(f"/v1/pages/{ids[1]}").status_code, 404)
+        self.assertEqual(self.c.get(f"/pages/{ids[1]}").status_code, 404)
 
     def test_owner_isolation_and_exam_delete_cascade(self):
         e = self._exam()
         pid = self._upload(e["id"]).json()["items"][0]["id"]
         self._work(1)
-        orig = self.c.get(f"/v1/pages/{pid}").json()["image"]["original_url"]
+        orig = self.c.get(f"/pages/{pid}").json()["image"]["original_url"].removeprefix("/api")
         other = self._client(owner="o2")
-        self.assertEqual(other.get(f"/v1/exams/{e['id']}").status_code, 404)
-        self.assertEqual(other.get(f"/v1/pages/{pid}").status_code, 404)
+        self.assertEqual(other.get(f"/exams/{e['id']}").status_code, 404)
+        self.assertEqual(other.get(f"/pages/{pid}").status_code, 404)
         self.assertEqual(other.get(orig).status_code, 404)
-        self.assertEqual(other.get("/v1/exams").json()["items"], [])
-        self.assertEqual(self.c.delete(f"/v1/exams/{e['id']}").status_code, 204)
-        self.assertEqual(self.c.get(f"/v1/pages/{pid}").status_code, 404)
+        self.assertEqual(other.get("/exams").json()["items"], [])
+        self.assertEqual(self.c.delete(f"/exams/{e['id']}").status_code, 204)
+        self.assertEqual(self.c.get(f"/pages/{pid}").status_code, 404)
         self.assertEqual(self.c.get(orig).status_code, 404)
 
     def test_job_dedup_and_deleted_page_is_skipped(self):
@@ -242,9 +245,9 @@ class FlowTest(unittest.TestCase):
         pid = self._upload(e["id"]).json()["items"][0]["id"]
         for _ in range(2):
             self.assertTrue(run_once(self.db, self.store, Boom(), retry_delay_s=0))
-            self.assertEqual(self.c.get(f"/v1/pages/{pid}").json()["processing"]["state"], "queued")
+            self.assertEqual(self.c.get(f"/pages/{pid}").json()["processing"]["state"], "queued")
         self.assertTrue(run_once(self.db, self.store, Boom(), retry_delay_s=0))
-        proc = self.c.get(f"/v1/pages/{pid}").json()["processing"]
+        proc = self.c.get(f"/pages/{pid}").json()["processing"]
         self.assertEqual((proc["state"], proc["message"]), ("failed", PAGE_FAILED_MESSAGE))
         self.assertFalse(run_once(self.db, self.store, Boom(), retry_delay_s=0))
 

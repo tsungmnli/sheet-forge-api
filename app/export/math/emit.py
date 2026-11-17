@@ -118,7 +118,7 @@ def emit_node(n):
         rows = [" ~~ ".join(emit_seq(c) for c in r) for r in n.rows]
         return "cases{" + " # ".join(rows) + "}"
     if isinstance(n, Deco):
-        return "bar {" + emit_seq(n.body) + "}"
+        return n.kind + " {" + emit_seq(n.body) + "}"          # bar | dot
     raise MathError(f"방출할 수 없는 노드 {type(n).__name__}")
 
 
@@ -220,7 +220,7 @@ def w_node(n, unary=False):
     if isinstance(n, Rm):
         return w_seq(n.body) + W["rm_pad"]
     if isinstance(n, Deco):
-        return w_seq(n.body) + W["deco_pad"]
+        return w_seq(n.body) + (0 if n.kind == "dot" else W["deco_pad"])
     if isinstance(n, Delim):
         if n.open == "|":
             side = W["bar"]

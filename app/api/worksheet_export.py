@@ -10,6 +10,7 @@ from ..export.hwpx import ExportMeta, ExportPreset, ExportRequest, export_hwpx
 from .adapters.store_images import StoreImages
 from .errors import ApiError
 from .export_source import load_problems, load_worksheet
+from .messages import report_message, report_summary
 from .serialize import iso
 from .service import safe_filename
 from .settings import Settings
@@ -37,6 +38,15 @@ def add_links(report: dict, links: dict) -> dict:
         pid = item.get("problem_id")
         if pid in links:
             item["link"] = {"exam_id": links[pid], "problem_id": pid}
+    return report
+
+
+def web_report(report: dict, links: dict) -> dict:
+    """웹으로 나가는 리포트: link를 붙이고, 개발자용 message를 쉬운 문장으로 바꾸고, summary를 넣는다(설계 3.1·5.7)."""
+    add_links(report, links)
+    for item in report["items"]:
+        item["message"] = report_message(item["code"])
+    report["summary"] = report_summary(report["items"])
     return report
 
 

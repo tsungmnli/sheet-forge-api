@@ -51,23 +51,23 @@ class TrashCascadeTest(unittest.TestCase):
     def _exam(self, n=3):
         """시험지 1건·사진 1장, 문제 n개를 읽고 모두 확인 완료. (exam_id, page_id, 문제 id 목록)"""
         c = self.c
-        exam = c.post("/v1/exams", json={"student": "민수"}).json()
-        r = c.post(f"/v1/exams/{exam['id']}/pages", files=[("files", ("p.png", make_png(40, 30), "image/png"))])
+        exam = c.post("/exams", json={"student": "민수"}).json()
+        r = c.post(f"/exams/{exam['id']}/pages", files=[("files", ("p.png", make_png(40, 30), "image/png"))])
         self.assertEqual(r.status_code, 202)
         page_id = r.json()["items"][0]["id"]
         self.assertTrue(run_once(self.db, self.store, FakePageProcessor(), recognizer=FakeRecognizer(),
                                  cleaner=FakeFigureCleaner()))
-        for s in c.get(f"/v1/pages/{page_id}").json()["segments"][:n]:
-            self.assertEqual(c.patch(f"/v1/pages/{page_id}/segments/{s['id']}", json={"marked": True}).status_code, 200)
-        self.assertEqual(c.post(f"/v1/exams/{exam['id']}/read").status_code, 202)
+        for s in c.get(f"/pages/{page_id}").json()["segments"][:n]:
+            self.assertEqual(c.patch(f"/pages/{page_id}/segments/{s['id']}", json={"marked": True}).status_code, 200)
+        self.assertEqual(c.post(f"/exams/{exam['id']}/read").status_code, 202)
         for _ in range(n):
             self.assertTrue(run_once(self.db, self.store, FakePageProcessor(), recognizer=FakeRecognizer(),
                                      cleaner=FakeFigureCleaner()))
-        ids = [i["problem_id"] for i in c.get(f"/v1/exams/{exam['id']}/problems").json()["items"] if i["problem_id"]]
+        ids = [i["problem_id"] for i in c.get(f"/exams/{exam['id']}/problems").json()["items"] if i["problem_id"]]
         self.assertEqual(len(ids), n)
         for pid in ids:
-            v = c.get(f"/v1/problems/{pid}").json()["version"]
-            self.assertEqual(c.post(f"/v1/problems/{pid}/confirm", headers=H(v)).status_code, 200)
+            v = c.get(f"/problems/{pid}").json()["version"]
+            self.assertEqual(c.post(f"/problems/{pid}/confirm", headers=H(v)).status_code, 200)
         return exam["id"], page_id, ids
 
     def _problem_marks(self):
@@ -78,33 +78,33 @@ class TrashCascadeTest(unittest.TestCase):
 
     def test_exam_delete_trashes_problems(self):
         exam_id, _, ids = self._exam()
-        ws = self.c.post("/v1/worksheets", json={"problem_ids": ids}).json()
-        self.assertEqual(self.c.delete(f"/v1/exams/{exam_id}").status_code, 204)
+        ws = self.c.post("/worksheets", json={"problem_ids": ids}).json()
+        self.assertEqual(self.c.delete(f"/exams/{exam_id}").status_code, 204)
         marks = self._problem_marks()
         self.assertEqual({marks[i] for i in ids}, {(True, exam_id)})
         for pid in ids:
-            self.assertEqual(self.c.get(f"/v1/problems/{pid}").status_code, 404)
-        self.assertEqual(self.c.get("/v1/problems").json()["items"], [])
-        items = self.c.get(f"/v1/worksheets/{ws['id']}").json()["items"]
+            self.assertEqual(self.c.get(f"/problems/{pid}").status_code, 404)
+        self.assertEqual(self.c.get("/problems").json()["items"], [])
+        items = self.c.get(f"/worksheets/{ws['id']}").json()["items"]
         self.assertEqual([i["deleted"] for i in items], [True, True, True])   # 문제지에는 '삭제된 문제'로 남는다
 
     def test_separately_deleted_problem_keeps_its_own_mark(self):
         exam_id, _, ids = self._exam()
-        self.assertEqual(self.c.delete(f"/v1/problems/{ids[0]}").status_code, 204)
-        self.assertEqual(self.c.delete(f"/v1/exams/{exam_id}").status_code, 204)
+        self.assertEqual(self.c.delete(f"/problems/{ids[0]}").status_code, 204)
+        self.assertEqual(self.c.delete(f"/exams/{exam_id}").status_code, 204)
         marks = self._problem_marks()
         self.assertEqual(marks[ids[0]], (True, None))            # 따로 지운 문제는 시험지 복구 때 되살아나면 안 된다
         self.assertEqual({marks[i] for i in ids[1:]}, {(True, exam_id)})
 
     def test_page_delete_trashes_its_problems_and_segments(self):
         exam_id, page_id, ids = self._exam()
-        self.assertEqual(self.c.delete(f"/v1/pages/{page_id}").status_code, 204)
+        self.assertEqual(self.c.delete(f"/pages/{page_id}").status_code, 204)
         self.assertEqual({self._problem_marks()[i] for i in ids}, {(True, page_id)})
         with self.db.session() as s:
             segs = s.execute(text("SELECT DISTINCT deleted_with FROM segments WHERE page_id = :p"), {"p": page_id}).all()
         self.assertEqual({r[0] for r in segs}, {page_id})
-        self.assertEqual(self.c.get(f"/v1/exams/{exam_id}").status_code, 200)   # 시험지는 그대로
-        self.assertEqual(self.c.delete(f"/v1/exams/{exam_id}").status_code, 204)
+        self.assertEqual(self.c.get(f"/exams/{exam_id}").status_code, 200)   # 시험지는 그대로
+        self.assertEqual(self.c.delete(f"/exams/{exam_id}").status_code, 204)
         self.assertEqual({self._problem_marks()[i] for i in ids}, {(True, page_id)})   # 이미 지운 것은 덮어쓰지 않는다
 
 

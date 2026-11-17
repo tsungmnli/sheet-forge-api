@@ -3,7 +3,7 @@ import os
 import re
 import time
 
-PREFIXES = frozenset({"exam", "page", "seg", "prob", "ws", "preset", "fig", "job", "img"})
+PREFIXES = frozenset({"exam", "page", "seg", "prob", "ws", "preset", "fig", "job", "img", "user"})
 _ALPHABET = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"  # Crockford base32
 _ULID = r"[0-7][0-9A-HJKMNP-TV-Z]{25}"
 

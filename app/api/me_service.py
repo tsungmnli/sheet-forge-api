@@ -28,8 +28,11 @@ class SettingsPatch(BaseModel):
     auto_next_after_confirm: bool | None = None
 
 
-def me(owner: str) -> dict:
-    return {"id": owner, "display_name": "선생님"}   # 인증 전 고정 값
+def me(owner: str, email: str | None = None) -> dict:
+    out = {"id": owner, "display_name": "선생님"}   # 표시 이름은 아직 고정 값
+    if email is not None:
+        out["email"] = email
+    return out
 
 
 def get_settings(session, owner: str) -> dict:

@@ -2,6 +2,8 @@
 from datetime import timezone
 
 POLL_MS = 2000
+# 브라우저가 보는 바깥 접두어. Ingress가 떼므로 앱 경로에는 붙이지 않는다(FastAPI root_path와 이미지 URL이 같이 쓴다).
+API_PREFIX = "/api"
 
 
 def iso(dt) -> str:
@@ -9,7 +11,7 @@ def iso(dt) -> str:
 
 
 def image_url(ref):
-    return f"/v1/images/{ref}" if ref else None
+    return f"{API_PREFIX}/images/{ref}" if ref else None
 
 
 def is_active(processing) -> bool:

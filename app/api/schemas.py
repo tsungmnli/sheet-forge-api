@@ -3,6 +3,8 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from .preset_shape import PresetValue
+
 
 class _Loose(BaseModel):
     model_config = ConfigDict(extra="allow")
@@ -40,11 +42,11 @@ class ProblemIn(_Loose):
 class ExportRequestBody(BaseModel):
     model_config = ConfigDict(extra="forbid")
     title: str = Field("", max_length=200)
-    preset: dict[str, Any] | None = None
+    preset: PresetValue | None = None
     problems: list[ProblemIn] = Field(default_factory=list)
     images: dict[str, str] = Field(default_factory=dict)   # ref → base64 PNG
 
 
 class LayoutPreviewBody(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    preset: dict[str, Any] | None = None
+    preset: PresetValue | None = None

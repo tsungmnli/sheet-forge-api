@@ -1,5 +1,8 @@
 """이미지 저장소. 운영은 MinIO(S3 호환), 개발·테스트는 메모리. ref는 `img_<ULID>`(불투명 값)이고 객체 키로 그대로 쓴다."""
 import io
+import os
+import pathlib
+import re
 
 
 class StorageError(Exception):
@@ -96,8 +99,68 @@ class MinioImageStore(ImageStore):
         self._ensure()
 
 
+class LocalImageStore(ImageStore):
+    """개발 전용: PC 폴더에 저장한다. API와 작업자가 같은 폴더를 가리켜야 한다(운영에는 쓰지 않는다).
+    `<ref>.bin`(내용)과 `<ref>.ct`(content type) 두 파일로 두고, 임시 파일에 쓴 뒤 바꿔 넣어 반쯤 쓴 파일을 읽지 않게 한다."""
+
+    def __init__(self, root):
+        self._root = pathlib.Path(root)
+
+    def _paths(self, ref):
+        if not re.fullmatch(r"[A-Za-z0-9_-]+", ref or ""):
+            raise StorageError("InvalidRef")
+        return self._root / (ref + ".bin"), self._root / (ref + ".ct")
+
+    def _write(self, path, data):
+        tmp = path.with_name(path.name + ".tmp")
+        tmp.write_bytes(data)
+        os.replace(tmp, path)
+
+    def put(self, ref, data, content_type):
+        bin_p, ct_p = self._paths(ref)
+        try:
+            self._root.mkdir(parents=True, exist_ok=True)
+            self._write(ct_p, content_type.encode("utf-8"))
+            self._write(bin_p, bytes(data))
+        except OSError as e:
+            raise StorageError(type(e).__name__) from e
+
+    def get(self, ref):
+        bin_p, ct_p = self._paths(ref)
+        try:
+            data = bin_p.read_bytes()
+        except FileNotFoundError:
+            return None
+        except OSError as e:
+            raise StorageError(type(e).__name__) from e
+        try:
+            ct = ct_p.read_bytes().decode("utf-8")
+        except OSError:
+            ct = "application/octet-stream"
+        return data, ct
+
+    def delete(self, ref):
+        for p in self._paths(ref):
+            try:
+                p.unlink()
+            except FileNotFoundError:
+                pass
+            except OSError as e:
+                raise StorageError(type(e).__name__) from e
+
+    def check(self):
+        try:
+            self._root.mkdir(parents=True, exist_ok=True)
+        except OSError as e:
+            raise StorageError(type(e).__name__) from e
+        if not os.access(self._root, os.W_OK):
+            raise StorageError("NotWritable")
+
+
 def build_store(settings):
-    """MinIO 주소가 없으면 None(사진 API는 503, 나머지는 그대로 동작)."""
+    """개발용 폴더(storage_dir)가 있으면 그것을, 아니면 MinIO를 쓴다. 둘 다 없으면 None(사진 API는 503, 나머지는 그대로 동작)."""
+    if getattr(settings, "storage_dir", ""):
+        return LocalImageStore(settings.storage_dir)
     if not settings.minio_endpoint:
         return None
     return MinioImageStore(settings.minio_endpoint, settings.minio_access_key, settings.minio_secret_key,

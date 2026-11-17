@@ -65,10 +65,16 @@ def _math_with_brackets(piece):
     return out
 
 
+# 상자 \fbox/\boxed는 변환기가 못 받는다. \text{..}로 바꾼다 [B안: 상자 모양은 잃음]
+_BOX = re.compile(r"\\text\{\\(?:fbox|boxed)\{([^{}]*)\}\}|\\(?:fbox|boxed)\{([^{}]*)\}")
+
 _TEXTCMD = re.compile(r"\\(?:text|mathrm|mbox)\{([^{}]*)\}")
 
 
 def _split_hangul(latex):
+    if _BOX.search(latex) or "\\begin{" in latex:
+        # cases 같은 환경이 쪼개지지 않도록 통째로 한 math로 둔다(수식 안 한글은 변환기가 작게 표시, 경고만)
+        return [_m(_BOX.sub(lambda m: "\\text{" + (m.group(1) or m.group(2)) + "}", latex))]
     if not _HANGUL.search(latex):
         return [_m(latex)]
     # 한글이 든 \text{..}는 껍데기를 벗기고, \left/\right는 일반 괄호로 바꿔야 쪼갠 뒤에도 수식이 깨지지 않는다
