@@ -6,12 +6,12 @@
 *.pyc
 .pytest_cache
 tests
-scripts
+scripts/*
+!scripts/invite.py
+!scripts/reset_password.py
 smoke
 docs
 deploy
-uv.lock
-pyproject.toml
 requirements-dev.txt
 *.hwpx
 !assets/templates/blank.hwpx

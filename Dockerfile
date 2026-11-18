@@ -4,19 +4,25 @@ FROM python:3.13-slim
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PIP_NO_CACHE_DIR=1 \
-    PIP_DISABLE_PIP_VERSION_CHECK=1
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    UV_LINK_MODE=copy \
+    UV_PYTHON_DOWNLOADS=never \
+    PATH="/srv/.venv/bin:$PATH"
 
 WORKDIR /srv
 
-# 의존성 레이어를 먼저(소스가 바뀌어도 캐시 재사용)
-COPY requirements.txt .
-RUN pip install -r requirements.txt
+# 의존성 레이어를 먼저(소스가 바뀌어도 캐시 재사용). CI가 테스트한 uv.lock 그대로 설치한다(운영 의존성만).
+RUN pip install uv
+COPY pyproject.toml uv.lock ./
+RUN uv sync --frozen --no-dev
 
 # 앱과 템플릿만 넣는다(tests·scripts는 .dockerignore로 제외)
 COPY app ./app
 COPY assets ./assets
 COPY alembic.ini ./
 COPY migrations ./migrations
+# 운영에서 kubectl exec로 초대·비밀번호 재설정을 하려고 이 두 스크립트만 넣는다.
+COPY scripts/invite.py scripts/reset_password.py ./scripts/
 
 RUN useradd --system --uid 10001 --no-create-home app
 USER 10001
