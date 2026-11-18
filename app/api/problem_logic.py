@@ -7,6 +7,7 @@ import re
 from ..export.math.convert import convert
 from .errors import ApiError
 from .schemas import ContentIn
+from .stem_blocks import iter_stem_inlines, normalize_block, stem_groups
 
 INLINE_TYPES = ("text", "math", "image")
 PLACEMENTS = ("after_stem", "after_choices")
@@ -27,10 +28,9 @@ def empty_content() -> dict:
 
 
 def iter_inlines(content: dict):
-    """(경로, inline) 목록. 경로는 stem/0/inlines/3, choices/items/2/0 형식(웹이 그 자리로 이동하는 데 쓴다)."""
-    for bi, block in enumerate(content.get("stem") or []):
-        for ii, inl in enumerate(block.get("inlines") or []):
-            yield f"stem/{bi}/inlines/{ii}", inl
+    """(경로, inline) 목록. 경로는 stem/0/inlines/3, choices/items/2/0 형식(웹이 그 자리로 이동하는 데 쓴다).
+    상자·표 안의 조각은 stem/2/paragraphs/1/inlines/0, stem/3/rows/1/2/0 형식이다(stem_blocks.py)."""
+    yield from iter_stem_inlines(content)
     for ci, item in enumerate((content.get("choices") or {}).get("items") or []):
         for ii, inl in enumerate(item or []):
             yield f"choices/items/{ci}/{ii}", inl
@@ -50,6 +50,7 @@ def normalize_content(content_in: ContentIn, stored_figures: list | None = None)
     c["choices"].setdefault("layout", "auto")
     if len(c["stem"]) > MAX_STEM_BLOCKS or len(c["choices"]["items"]) > MAX_CHOICES:
         raise _bad("문단이나 선택지가 너무 많아요.")
+    c["stem"] = [normalize_block(b, _bad) for b in c["stem"]]   # 상자·표는 저장 모양으로 맞추고 모양을 검사한다
     valid_refs = set()
     for f in stored_figures or []:
         valid_refs.update(v for v in (f.get("id"), f.get("raw_ref"), f.get("clean_ref")) if v)
@@ -115,13 +116,14 @@ def merge_figures(submitted: list, stored: list) -> list:
 def preview(content: dict, limit: int = 100) -> str:
     """목록에 보여 줄 쉬운 평문 요약. 수식은 LaTeX 원문 그대로."""
     parts = []
-    for block in content.get("stem") or []:
-        for inl in block.get("inlines") or []:
+    for group, sep in stem_groups(content):
+        for inl in group:
             t = inl.get("t")
             if t == "text":
                 parts.append(inl.get("v") or "")
             elif t == "math":
                 parts.append(inl.get("latex") or "")
+        parts.append(sep)
     s = " ".join("".join(parts).split())
     return s if len(s) <= limit else s[:limit].rstrip() + "…"
 
@@ -129,8 +131,8 @@ def preview(content: dict, limit: int = 100) -> str:
 def preview_tex(content: dict, limit: int = 100) -> str:
     """목록 렌더링용 요약. preview와 같지만 수식을 $…$로 감싼다. 수식은 중간에서 자르지 않는다."""
     out, n, cut = [], 0, False
-    for block in content.get("stem") or []:
-        for inl in block.get("inlines") or []:
+    for group, _sep in stem_groups(content):
+        for inl in group:
             t = inl.get("t")
             if t == "text":
                 s = re.sub(r"\s+", " ", inl.get("v") or "")

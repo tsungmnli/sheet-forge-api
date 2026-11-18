@@ -50,12 +50,13 @@ def build_recognizer(settings, client=None):
         client = GeminiClient(settings.llm_api_key)
     from .llm.recognizer import RealRecognizer
 
-    def limits(model):
-        return LlmLimits(timeout_s=float(settings.llm_timeout_s), max_output_tokens=READ_MAX_OUTPUT,
+    def limits(model, timeout_s):
+        return LlmLimits(timeout_s=float(timeout_s), max_output_tokens=READ_MAX_OUTPUT,
                          generation_extra=thinking_extra(model))
 
     return RealRecognizer(client, settings.read_model, settings.reread_model,
-                          limits=limits(settings.read_model), high_limits=limits(settings.reread_model))
+                          limits=limits(settings.read_model, settings.llm_timeout_s),
+                          high_limits=limits(settings.reread_model, settings.reread_timeout_s))
 
 
 # ---- B5-4c: FigureCleaner ----

@@ -106,6 +106,42 @@ def validate_package(data: bytes) -> list:
         sz = e.find(f"{{{HP}}}sz")
         if sz is None or int(sz.get("width", 0)) <= 0 or int(sz.get("height", 0)) <= 0:
             problems.append(f"그림 {e.get('id')}: sz가 올바르지 않음")
+    # 묶음 개체(<보기> 상자): id 고유, 크기 > 0, 글상자 안 문단 모양이 존재(문단 검사는 위에서 중첩 문단까지 이미 함)
+    box_ids = set()
+    for e in sec.iter(f"{{{HP}}}container"):
+        if e.get("id") in box_ids or e.get("id") in eq_ids or e.get("id") in pic_ids or e.get("id") in seen:
+            problems.append(f"묶음 개체 id 중복 {e.get('id')}")
+        box_ids.add(e.get("id"))
+        sz = e.find(f"{{{HP}}}sz")
+        if sz is None or int(sz.get("width", 0)) <= 0 or int(sz.get("height", 0)) <= 0:
+            problems.append(f"묶음 개체 {e.get('id')}: sz가 올바르지 않음")
+    # 표: id 고유, 행·열 수 일치, 행마다 칸 폭 합 = 표 폭, 칸 모양(borderFill) 존재, borderFills itemCnt
+    border_ids = set(ids_of("borderFill"))
+    for bf in head.iter(f"{{{HH}}}borderFills"):
+        real = len(bf.findall(f"{{{HH}}}borderFill"))
+        if int(bf.get("itemCnt")) != real:
+            problems.append(f"borderFills itemCnt={bf.get('itemCnt')} 실제={real}")
+    tbl_ids = set()
+    for e in sec.iter(f"{{{HP}}}tbl"):
+        tid = e.get("id")
+        if tid in tbl_ids or tid in box_ids or tid in eq_ids or tid in pic_ids or tid in seen:
+            problems.append(f"표 id 중복 {tid}")
+        tbl_ids.add(tid)
+        trs = e.findall(f"{{{HP}}}tr")
+        width = int(e.find(f"{{{HP}}}sz").get("width", 0))
+        if int(e.get("rowCnt")) != len(trs):
+            problems.append(f"표 {tid}: rowCnt={e.get('rowCnt')} 실제={len(trs)}")
+        if e.get("borderFillIDRef") not in border_ids:
+            problems.append(f"표 {tid}: borderFillIDRef={e.get('borderFillIDRef')} 없음")
+        for ri, tr in enumerate(trs):
+            tcs = tr.findall(f"{{{HP}}}tc")
+            if len(tcs) != int(e.get("colCnt")):
+                problems.append(f"표 {tid} {ri}행: 칸 수 {len(tcs)} != colCnt={e.get('colCnt')}")
+            if sum(int(tc.find(f"{{{HP}}}cellSz").get("width")) for tc in tcs) != width:
+                problems.append(f"표 {tid} {ri}행: 칸 폭 합이 표 폭 {width}과 다름")
+            for tc in tcs:
+                if tc.get("borderFillIDRef") not in border_ids:
+                    problems.append(f"표 {tid}: 칸의 borderFillIDRef={tc.get('borderFillIDRef')} 없음")
     for pr in head.iter(f"{{{HH}}}paraPr"):
         if pr.get("tabPrIDRef") not in tab_ids:
             problems.append(f"paraPr {pr.get('id')}의 tabPrIDRef={pr.get('tabPrIDRef')} 없음")

@@ -6,7 +6,7 @@ import copy
 from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import and_, select
-from sqlalchemy import func, text
+from sqlalchemy import func, text, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from ..db.ids import new_id
@@ -54,6 +54,18 @@ def _require_editable(p: Problem) -> None:
         raise ApiError(409, "PROBLEM_CONFIRMED")
 
 
+def _fail_reason(p: Problem) -> str | None:
+    """읽기에 실패한 문제는 왜 실패했는지, 다시 읽기만 실패해 이전 결과를 남긴 문제는 그 사유를 쉬운 문장으로 알려 준다."""
+    key = {"failed": "fail", "needs_review": "reread_fail"}.get(p.status)
+    return ((p.ocr_meta or {}).get(key) or {}).get("message") or None if key else None
+
+
+def _clear_fail(p: Problem) -> None:
+    meta = p.ocr_meta or {}
+    if "fail" in meta or "reread_fail" in meta:
+        p.ocr_meta = {k: v for k, v in meta.items() if k not in ("fail", "reread_fail")}
+
+
 def problem_view(session, p: Problem) -> dict:
     seg = session.get(Segment, p.segment_id)
     hints, blockers, has = analyze(p.content)
@@ -65,6 +77,7 @@ def problem_view(session, p: Problem) -> dict:
             "content": p.content, "points": p.points, "ocr": {"has_recognized": p.recognized is not None},
             "hints": hints,
             "removed_figures": (p.ocr_meta or {}).get("removed_figures") or [],
+            "fail_reason": _fail_reason(p),
             "checks": {"can_confirm": p.status in EDITABLE and not blockers, "blockers": blockers},
             "poll_after_ms": POLL_MS if p.status == "recognizing" else None}
 
@@ -91,6 +104,14 @@ def consume_reads(session, owner: str, units: int, limit: int, now) -> None:
             .returning(ReadUsage.units))
     if session.execute(stmt).first() is None:
         raise ApiError(429, "READ_LIMIT")
+
+
+def refund_reads(session, owner: str, units: int, now) -> None:
+    """읽기에 끝내 실패했을 때 미리 차감한 한도를 돌려준다(0 밑으로는 내리지 않는다). 커밋은 호출자."""
+    if units <= 0:
+        return
+    session.execute(update(ReadUsage).where(ReadUsage.owner_id == owner, ReadUsage.day == _today(now))
+                    .values(units=func.greatest(ReadUsage.units - units, 0)))
 
 
 def read_segments(session, owner: str, exam_id: str, segment_ids, settings, now) -> dict:
@@ -165,7 +186,8 @@ def list_exam_problems(session, owner: str, exam_id: str, state) -> dict:
         items.append({"segment_id": seg.id, "page_id": seg.page_id, "number": seg.number, "bbox": list(seg.bbox),
                       "crop_url": image_url(prob.crop_ref) if prob is not None else None, "state": st,
                       "problem_id": prob.id if prob is not None else None, "preview": text_preview,
-                      "preview_tex": text_preview_tex, "badges": badges})
+                      "preview_tex": text_preview_tex, "badges": badges,
+                      "fail_reason": _fail_reason(prob) if prob is not None else None})
     return {"items": items, "poll_after_ms": POLL_MS if active else None}
 
 
@@ -210,6 +232,7 @@ def confirm(session, owner: str, pid: str, version: int) -> dict:
         raise ApiError(409, "MATH_UNSUPPORTED", details=[{"path": b["path"], "message": b["message"]} for b in blockers])
     if p.recognized is not None:  # B5-4a: 고친 조각 수(숫자만). 직접 입력한 문제는 기준이 없어 건너뜀
         p.ocr_meta = {**(p.ocr_meta or {}), "edits": count_edits(p.recognized, p.content)}
+    _clear_fail(p)
     p.status = "confirmed"
     _bump(p)
     touch_exam(session, p.exam_id)
@@ -249,6 +272,7 @@ def reread(session, owner: str, pid: str, settings, now) -> dict:
     if p.status == "recognizing":
         raise ApiError(409, "PROBLEM_BUSY")
     consume_reads(session, owner, 2, settings.daily_read_limit, now)  # 다시 읽기는 2배 가중
+    _clear_fail(p)
     p.status = "recognizing"
     _bump(p)
     enqueue(session, owner, "problem_reread", "problem", p.id)

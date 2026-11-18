@@ -3,8 +3,11 @@
 1) text 조각 안의 독립된 영문 한 글자(변수)를 math 조각으로 뺀다.
 2) math 조각 안의 한글을 text 조각으로 뺀다.
 3) 이웃한 같은 종류의 조각을 합치고 빈 조각을 지운다. 줄 끝에서 쪼개진 문단을 합친다.
+상자·표 안의 조각도 같은 방식으로 고친다(문단 합치기는 stem 문단과 상자 줄에만 적용하고, 상자·표를 넘어 합치지 않는다).
 입력은 {"stem":[{"inlines":[...]}], "choices":[{"inlines":[...]}]|None, ...} 이고 제자리에서 고친다. 고친 조각 수를 돌려준다(내용 없이 숫자만 ocr_meta에 남긴다)."""
 import re
+
+from .blocks import inlines_of, is_para, iter_inlines
 
 _HANGUL = re.compile(r"([가-힣ㄱ-ㅎㅏ-ㅣ]+(?:[ \t]+[가-힣ㄱ-ㅎㅏ-ㅣ]+)*)")
 _VAR = re.compile(r"(?<![A-Za-z\\])([A-Za-z])(?![A-Za-z])")
@@ -132,7 +135,7 @@ def _merge_paragraphs(paras):
     뒤 문단이 보기 기호(ㄱ.)·(단,·<보기> 제목으로 시작하지 않으면 한 문단으로 합친다."""
     out, n = [], 0
     for p in paras:
-        if out:
+        if out and is_para(out[-1]) and is_para(p):
             prev, cur = out[-1]["inlines"], p["inlines"]
             pt, ct = _plain(prev), _plain(cur)
             if prev and cur and prev[-1]["t"] == "text" and pt.strip() and not _END.search(pt) and not _MARK.match(ct):
@@ -145,10 +148,12 @@ def _merge_paragraphs(paras):
 
 def normalize_read(obj):
     n = 0
-    for key in ("stem", "choices"):
-        for para in obj.get(key) or []:
-            n += _fix_escapes(para.get("inlines") or [])
-            para["inlines"], ch = _fix_inlines(para.get("inlines") or [])
-            n += ch
+    for _, cont, key in iter_inlines(obj):
+        n += _fix_escapes(inlines_of(cont, key))
+        cont[key], ch = _fix_inlines(inlines_of(cont, key))
+        n += ch
     n += _merge_paragraphs(obj.get("stem") or [])
+    for blk in obj.get("stem") or []:
+        if blk.get("type") == "box":
+            n += _merge_paragraphs(blk["paragraphs"])
     return n

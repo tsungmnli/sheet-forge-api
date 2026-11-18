@@ -7,6 +7,8 @@ recognized(기계가 읽은 결과)와 content(선생님이 확인한 내용)를
 from collections import Counter
 from difflib import SequenceMatcher
 
+from .stem_blocks import block_groups
+
 KINDS = ("text", "math", "choices", "paragraphs")
 _PARA = "paragraphs"
 
@@ -25,7 +27,10 @@ def _stem_tokens(content: dict) -> list:
     for bi, block in enumerate(content.get("stem") or []):
         if bi:
             out.append((_PARA, ""))
-        out += [_tok(i) for i in (block.get("inlines") or [])]
+        for gi, group in enumerate(block_groups(block)):   # 문단은 묶음 하나, 상자는 줄마다, 표는 칸마다
+            if gi:
+                out.append((_PARA, ""))
+            out += [_tok(i) for i in group]
     return out
 
 

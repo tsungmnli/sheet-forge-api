@@ -50,6 +50,46 @@ def rec(client, **kw):
     return RealRecognizer(client, "lite", "flash", convert_fn=conv, **kw)
 
 
+class FallbackTest(unittest.TestCase):
+    """다시 읽기(상위 모델)가 일시적 오류로 실패하면 처음 읽기 모델로 한 번 더 읽는다."""
+
+    def test_high_timeout_falls_back_to_default_model(self):
+        c = FakeClient(LlmError("timeout"), read_json(T("값을 구하시오. ")))
+        r = rec(c).read(png(600, 400), "high")
+        self.assertEqual([call[0] for call in c.calls], ["flash", "lite"])      # 상위 → 처음 읽기 모델
+        self.assertEqual(r.meta["fallback"], {"from_model": "flash", "reason": "timeout"})
+        self.assertEqual((r.meta["model"], r.meta["tier"]), ("lite", "default"))   # 실제로 읽은 모델을 그대로 남긴다
+        self.assertEqual(r.content["stem"][0]["inlines"], [{"t": "text", "v": "값을 구하시오. "}])
+
+    def test_other_transient_kinds_also_fall_back(self):
+        for kind in ("network", "server", "rate_limit"):
+            c = FakeClient(LlmError(kind), read_json(T("값")))
+            self.assertEqual(rec(c).read(png(600, 400), "high").meta["fallback"]["reason"], kind)
+
+    def test_no_fallback_for_config_or_blocked_errors(self):
+        for kind in ("auth", "bad_request", "blocked"):
+            c = FakeClient(LlmError(kind), read_json(T("값")))
+            with self.assertRaises(LlmError):
+                rec(c).read(png(600, 400), "high")
+            self.assertEqual(len(c.calls), 1)                                   # 다른 모델로 다시 부르지 않는다
+
+    def test_no_fallback_for_default_tier_or_same_model(self):
+        c = FakeClient(LlmError("timeout"), read_json(T("값")))
+        with self.assertRaises(LlmError):
+            rec(c).read(png(600, 400))                                          # 처음 읽기는 바꿀 모델이 없다
+        self.assertEqual(len(c.calls), 1)
+        c = FakeClient(LlmError("timeout"), read_json(T("값")))
+        with self.assertRaises(LlmError):
+            RealRecognizer(c, "same", convert_fn=conv).read(png(600, 400), "high")   # 상위·처음 모델이 같으면 소용없다
+        self.assertEqual(len(c.calls), 1)
+
+    def test_fallback_failure_is_raised(self):
+        c = FakeClient(LlmError("timeout"), LlmError("timeout"))
+        with self.assertRaises(LlmError):
+            rec(c).read(png(600, 400), "high")
+        self.assertEqual([call[0] for call in c.calls], ["flash", "lite"])      # 한 번만 바꿔 본다
+
+
 class ReadTest(unittest.TestCase):
     def test_happy_path_content_and_meta(self):
         c = FakeClient(read_json(T("값을 구하시오. "), M("1+2"), choices=[{"inlines": [M("3")]}]))
@@ -60,7 +100,7 @@ class ReadTest(unittest.TestCase):
         self.assertEqual(r.content["choices"], {"items": [[{"t": "math", "latex": "3"}]], "layout": "auto"})
         self.assertEqual(r.content["figures"], [])
         m = r.meta
-        self.assertEqual((m["engine"], m["tier"], m["model"], m["prompt"], m["retried"]), ("llm", "default", "lite", "read_v4", False))
+        self.assertEqual((m["engine"], m["tier"], m["model"], m["prompt"], m["retried"]), ("llm", "default", "lite", "read_v5", False))
         self.assertEqual((m["math_repaired"], m["math_failed"], m["math_warnings"]), (0, [], []))
         self.assertEqual([u["call"] for u in m["usage"]], ["read"])
         self.assertNotIn("값을", json.dumps(m, ensure_ascii=False))

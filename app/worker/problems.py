@@ -4,14 +4,19 @@
 """
 import copy
 import logging
+from datetime import datetime, timezone
 
 from sqlalchemy import func, select
 
 from ..api.problem_logic import MAX_FIGURES, normalize_read_content, search_text
+from ..api.problem_service import refund_reads
 from ..db.ids import new_id
 from ..db.models import Page, Problem, Segment
 from ..jobs import enqueue
 from ..recognition import imaging
+from ..recognition.llm.read import ReadParseError
+from ..recognition.llm.recognizer import ReadEmptyError
+from ..recognition.ports import LlmError
 from ..recognition.usage import record_job_usage
 from ..storage.images import StorageError
 
@@ -166,13 +171,53 @@ def handle_figure_clean(db, store, cleaner, job) -> None:
     raise RuntimeError("FIGURE_REGION_CHANGING")
 
 
-def mark_failed(db, job) -> None:
+FAIL_GENERIC = "읽는 중에 문제가 생겼어요. 다시 읽어 보세요."
+FAIL_BY_LLM_KIND = {
+    "timeout": "읽는 데 시간이 너무 오래 걸렸어요. 잠시 뒤 다시 읽어 보세요.",
+    "network": "읽기 서비스에 연결하지 못했어요. 잠시 뒤 다시 읽어 보세요.",
+    "rate_limit": "지금 읽기 요청이 몰려 있어요. 잠시 뒤 다시 읽어 보세요.",
+    "server": "읽기 서비스가 잠시 불안정해요. 잠시 뒤 다시 읽어 보세요.",
+    "blocked": "이 사진은 안전 기준 때문에 읽을 수 없었어요. 영역을 다시 고르거나 직접 입력해 주세요.",
+    "empty": "글자와 수식을 찾지 못했어요. 영역을 다시 고른 뒤 읽어 보세요.",
+    "bad_response": "읽은 결과를 받지 못했어요. 다시 읽어 보세요.",
+    "auth": "읽기 서비스 설정에 문제가 있어요. 관리자에게 알려 주세요.",
+    "bad_request": "읽기 서비스 설정에 문제가 있어요. 관리자에게 알려 주세요.",
+}
+
+
+def read_fail_info(exc: BaseException | None) -> dict:
+    """읽기 실패 원인을 선생님께 보여 줄 쉬운 문장으로 바꾼다. code는 종류만(내용·키 없음)."""
+    if isinstance(exc, LlmError):
+        return {"code": f"llm_{exc.kind}", "message": FAIL_BY_LLM_KIND.get(exc.kind, FAIL_GENERIC)}
+    if isinstance(exc, ReadEmptyError):
+        return {"code": "empty", "message": "글자와 수식을 찾지 못했어요. 영역을 다시 고른 뒤 읽어 보세요."}
+    if isinstance(exc, ReadParseError):
+        return {"code": "parse", "message": "읽은 내용을 정리하지 못했어요. 다시 읽어 보세요. 계속 안 되면 직접 입력해 주세요."}
+    if isinstance(exc, StorageError):
+        return {"code": "storage", "message": "사진을 불러오지 못했어요. 잠시 뒤 다시 읽어 보세요."}
+    return {"code": "unknown", "message": FAIL_GENERIC}
+
+
+def mark_failed(db, job, exc: BaseException | None = None) -> None:
     """마지막 시도까지 실패했을 때 사용자에게 보이는 상태를 정리한다."""
     with db.session() as s:
         if job.kind in ("problem_read", "problem_reread"):
             p = s.execute(select(Problem).where(Problem.id == job.target_id).with_for_update()).scalar_one_or_none()
             if p is not None and p.deleted_at is None and p.status == "recognizing":
-                p.status = "failed"
+                info = read_fail_info(exc)
+                # 이미 읽어 둔 결과가 있는데 '다시 읽기'만 실패했다면, 결과를 비운 실패 상태로 두지 않고
+                # 이전 내용 그대로 확인 필요로 돌려놓는다(실패 사유만 따로 알려 준다).
+                has_prev = (job.kind == "problem_reread" and p.recognized is not None
+                            and bool(p.search_text or (p.content or {}).get("figures")))
+                # 읽기 한도는 요청할 때 미리 차감했다(읽기 1, 다시 읽기 2). 끝내 실패했으니 그만큼 돌려준다.
+                # 이 블록은 상태가 recognizing일 때만 들어오므로 한 번만 돌려준다.
+                refund_reads(s, job.owner_id, 2 if job.kind == "problem_reread" else 1, datetime.now(timezone.utc))
+                if has_prev:
+                    p.status = "needs_review"
+                    p.ocr_meta = {**(p.ocr_meta or {}), "reread_fail": info}
+                else:
+                    p.status = "failed"
+                    p.ocr_meta = {**(p.ocr_meta or {}), "fail": info}   # 다시 읽기에 성공하면 ocr_meta가 새로 써져 사라진다
                 _bump(p)
         elif job.kind == "figure_clean":
             p = s.execute(select(Problem).where(Problem.deleted_at.is_(None), Problem.content.contains(

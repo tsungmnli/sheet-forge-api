@@ -66,4 +66,12 @@ def patch_header(header_xml: str, layout: LayoutContext, font_name: str, registr
             raise TemplateError("tabProperties를 찾지 못함")
         xml = xml.replace(tm.group(0), f'<hh:tabProperties itemCnt="{int(tm.group(1)) + len(tabs)}">', 1)
         xml = xml.replace("</hh:tabProperties>", "".join(tabs) + "</hh:tabProperties>", 1)
+    # 5) borderFill 추가 + itemCnt 갱신 (표 테두리)
+    borders = registry.new_border_xml
+    if borders:
+        bm = re.search(r'<hh:borderFills itemCnt="(\d+)">', xml)
+        if not bm or "</hh:borderFills>" not in xml:
+            raise TemplateError("borderFills를 찾지 못함")
+        xml = xml.replace(bm.group(0), f'<hh:borderFills itemCnt="{int(bm.group(1)) + len(borders)}">', 1)
+        xml = xml.replace("</hh:borderFills>", "".join(borders) + "</hh:borderFills>", 1)
     return xml

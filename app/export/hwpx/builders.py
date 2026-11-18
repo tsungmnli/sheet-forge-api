@@ -6,6 +6,7 @@ from ..math.convert import convert
 from .images import load_image
 from .preset import mm_to_hwp
 from .report import ExportReport
+from . import box_geometry as bg
 
 _BAD_XML = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\ufffe\uffff]")
 
@@ -32,6 +33,35 @@ class Picture:
     bin_id: int = 0
     org_w: int = 0
     org_h: int = 0
+
+
+@dataclass
+class BoxPart:
+    """<보기> 상자(묶음 개체: 본문 글상자 + 윗선에 걸친 제목 글상자). lines는 줄마다 str | Equation 목록.
+    body_pr·title_pr는 내보낼 때 StyleRegistry가 정한 문단 모양 id."""
+    title: str
+    lines: list
+    geom: object
+    body_pr: int = 0
+    title_pr: int = 0
+
+
+@dataclass
+class TablePart:
+    """표. rows는 행마다 셀(str | Equation 목록)의 목록. col_w·row_h는 HWPUNIT. cell_pr·border_id는 내보낼 때 정한다."""
+    rows: list
+    col_w: list
+    row_h: list
+    cell_pr: int = 0
+    border_id: int = 0
+
+    @property
+    def width(self) -> int:
+        return sum(self.col_w)
+
+    @property
+    def height(self) -> int:
+        return sum(self.row_h)
 
 
 class Tab:
@@ -205,6 +235,16 @@ def build_problem_paragraphs(problem: dict, number_text: str, report: ExportRepo
         return None
     specs = [ParagraphSpec([number_text], role="number", problem_id=pid)]
     for bi, block in enumerate(content.get("stem") or []):
+        if block.get("type") == "box":
+            spec = _box_spec(block, bi, pid, report, layout)
+            if spec is not None:
+                specs.append(spec)
+            continue
+        if block.get("type") == "table":
+            spec = _table_spec(block, bi, pid, report, layout)
+            if spec is not None:
+                specs.append(spec)
+            continue
         if block.get("type", "paragraph") != "paragraph":
             report.add("NOT_IMPLEMENTED", "warn", f"블록 종류 '{block.get('type')}'는 아직 지원하지 않아 제외함", pid, "stem")
             continue
@@ -219,6 +259,67 @@ def build_problem_paragraphs(problem: dict, number_text: str, report: ExportRepo
         s.keep_with_next, s.keep_lines = True, True
     specs[-1].keep_with_next, specs[-1].keep_lines = False, True
     return specs
+
+
+# ---------------------------------------------------------------- <보기> 상자 [샘플 시험지.hwpx 기준]
+def _box_spec(block: dict, bi: int, pid, report: ExportReport, layout):
+    """box 블록({"type":"box","title":"<보기>","paragraphs":[{"inlines":[...]} | [...], ...]}) → 상자 문단.
+    상자 폭은 들어갈 단의 폭을 따르고(1·2·3단), 제목은 윗선 위 가로·세로 가운데에 놓는다.
+    높이는 줄 수에서 추정한다(한글이 다시 계산하지 않는다)."""
+    path = f"stem[{bi}]"
+    col_w = layout.col_w if layout else bg.DEFAULT_COL_W
+    font = layout.font_hwp if layout else 1000
+    pct = layout.line_spacing_pct if layout else 160
+    text_w = bg.box_width(col_w) - 2 * bg.TEXT_MARGIN
+    max_em = EQ_WRAP_RATIO * text_w / font if layout else float("inf")
+    lines, plan = [], []
+    for k, para in enumerate(block.get("paragraphs") or []):
+        inl = para.get("inlines") if isinstance(para, dict) else para
+        parts = _paragraph_parts(inl, pid, report, max_em, f"{path}.paragraphs[{k}]")
+        em = sum(bg.text_em(p) if isinstance(p, str) else p.width_em for p in parts)
+        n_eq = sum(1 for p in parts if isinstance(p, Equation))
+        lines.append(parts)
+        plan.append((bg.line_rows(em, n_eq, text_w, font), n_eq > 0))
+    if not lines:
+        report.add("BOX_EMPTY", "warn", "내용이 없는 상자를 제외함", pid, path)
+        return None
+    title = clean_text(str(block.get("title") or "<보기>"))
+    geom = bg.plan_box(col_w, title, plan, font, pct)
+    report.add("BOX_HEIGHT_ESTIMATED", "info",
+               f"상자 높이({geom.height})는 줄 수로 추정한 값 — 한글에서 글이 넘치거나 남으면 상자 크기를 조절하세요", pid, path)
+    return ParagraphSpec([BoxPart(bg.display_title(title), lines, geom)], role="box", problem_id=pid)
+
+
+# ---------------------------------------------------------------- 표 [샘플 시험지.hwpx 기준]
+def _cell_inlines(cell):
+    return cell.get("inlines") if isinstance(cell, dict) else cell
+
+
+def _table_spec(block: dict, bi: int, pid, report: ExportReport, layout):
+    """table 블록({"type":"table","rows":[[셀, ...], ...]}; 셀 = 인라인 목록 또는 {"inlines":[...]}) → 표 문단.
+    표 폭은 단 폭에서 샘플만큼 줄이고, 열 폭은 내용 길이에 비례해 나눈다. 모든 셀은 가운데 정렬.
+    행이 짧으면 빈 셀로 채운다. 셀 합치기·음영은 아직 지원하지 않는다."""
+    path = f"stem[{bi}]"
+    col_w = layout.col_w if layout else bg.DEFAULT_COL_W
+    font = layout.font_hwp if layout else 1000
+    pct = layout.line_spacing_pct if layout else 160
+    raw = [r for r in (block.get("rows") or []) if r]
+    ncols = max((len(r) for r in raw), default=0)
+    if not raw or ncols == 0:
+        report.add("TABLE_EMPTY", "warn", "내용이 없는 표를 제외함", pid, path)
+        return None
+    rows = []
+    for ri, r in enumerate(raw):
+        row = [_paragraph_parts(_cell_inlines(c), pid, report, float("inf"), f"{path}.rows[{ri}][{ci}]")
+               for ci, c in enumerate(r)]
+        rows.append(row + [[] for _ in range(ncols - len(row))])
+    stats = [[(sum(bg.text_em(p) if isinstance(p, str) else p.width_em for p in cell),
+               sum(1 for p in cell if isinstance(p, Equation)),
+               any(isinstance(p, Equation) for p in cell)) for cell in row] for row in rows]
+    weights = [max(s[j][0] for s in stats) + 2 * bg.CELL_MARGIN_X / font for j in range(ncols)]
+    widths = bg.split_widths(weights, bg.table_width(col_w))
+    heights = [bg.row_height(s, widths, font, pct) for s in stats]
+    return ParagraphSpec([TablePart(rows, widths, heights)], role="table", problem_id=pid)
 
 
 # ---------------------------------------------------------------- 그림 [설계 11장, 검증 4.7.2]

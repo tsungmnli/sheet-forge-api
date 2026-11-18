@@ -4,7 +4,7 @@ poll_after_ms는 처리 중인 것이 있을 때만 값이 있고, 없으면 nul
 """
 from typing import Annotated, Literal, Union
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_serializer
 
 
 class ExamCreateIn(BaseModel):
@@ -148,9 +148,27 @@ class ImageInlineIn(_OpenIn):
 InlineIn = Annotated[Union[TextInlineIn, MathInlineIn, ImageInlineIn], Field(discriminator="t")]
 
 
+class BoxLineIn(_OpenIn):
+    inlines: list[InlineIn] = Field(default_factory=list)
+
+
 class StemBlockIn(_OpenIn):
+    """type: paragraph(inlines) · box(title, paragraphs) · table(rows: 행 → 칸 → 조각 목록)."""
     type: str = "paragraph"
     inlines: list[InlineIn] = Field(default_factory=list)
+    title: str | None = None
+    paragraphs: list[BoxLineIn] | None = None
+    rows: list[list[list[InlineIn]]] | None = None
+
+    @model_serializer(mode="wrap")
+    def _tidy(self, handler):
+        d = handler(self)
+        for k in ("title", "paragraphs", "rows"):
+            if d.get(k) is None:
+                d.pop(k, None)
+        if d.get("type") in ("box", "table") and not d.get("inlines"):
+            d.pop("inlines", None)
+        return d
 
 
 class ChoicesIn(_OpenIn):

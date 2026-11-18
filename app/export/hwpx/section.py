@@ -3,13 +3,19 @@ import re
 from xml.sax.saxutils import escape
 
 from .errors import TemplateError
-from .builders import Picture, Tab
+from .builders import BoxPart, Picture, Tab, TablePart
 from .layout import LayoutContext
 
 PARA_ID_BASE = 2_147_483_648  # 문단 id는 카운터로 고유값 부여
 TAB_XML = '<hp:tab width="0" leader="0" type="1"/>'  # 폭은 한글이 다시 계산 [검증 t11a]
 PIC_ID_BASE = 1_500_000_000  # 그림 id·instid 카운터
 PIC_Z_BASE = 50_000           # 그림 zOrder(수식 zOrder 0~와 겹치지 않게)
+BOX_ID_BASE = 1_700_000_000   # 묶음 개체·글상자 id·instid (상자 하나가 3개씩 쓴다)
+BOX_Z_BASE = 70_000           # 묶음 개체 zOrder
+BOX_PARA_BASE = 3_000_000_000  # 상자 안 문단 id(본문 문단 id 2^31~ 와 겹치지 않게)
+TBL_ID_BASE = 1_800_000_000   # 표 id
+TBL_Z_BASE = 80_000           # 표 zOrder
+BOX_UNIT = 8504               # 샘플 글상자의 orgSz(정사각). 실제 크기는 scaMatrix 배율로 정한다
 EQ_ID_BASE = 1_000_000_000    # 수식 id·zOrder도 카운터로 고유값 부여 [검증 t5: 0이어도 열리지만 고유값 권장]
 
 
@@ -54,6 +60,88 @@ def picture_xml(pic_id: int, z_order: int, bin_id: int, w: int, h: int, org_w: i
             '<hp:outMargin left="0" right="0" top="0" bottom="0"/><hp:shapeComment>그림입니다.</hp:shapeComment></hp:pic>')
 
 
+def _f(v: float) -> str:
+    return f"{v:.6f}".rstrip("0").rstrip(".")
+
+
+def _rect_xml(inst: int, x: int, y: int, w: int, h: int, solid: bool, last_w: int, paras: str) -> str:
+    """글상자 하나(hp:rect + drawText). 샘플의 모양을 그대로 따른다: orgSz는 8504 정사각형,
+    크기는 두 번째 scaMatrix 배율(w/8504, h/8504), 위치는 offset과 transMatrix 둘 다에 넣는다."""
+    line = ('<hp:lineShape color="#000000" width="33" style="SOLID" endCap="FLAT" headStyle="NORMAL" tailStyle="NORMAL" '
+            'headfill="1" tailfill="1" headSz="MEDIUM_MEDIUM" tailSz="MEDIUM_MEDIUM" outlineStyle="NORMAL" alpha="0"/>'
+            if solid else
+            '<hp:lineShape color="#000000" width="33" style="NONE" endCap="FLAT" headStyle="NORMAL" tailStyle="NORMAL" '
+            'headfill="1" tailfill="1" headSz="SMALL_SMALL" tailSz="SMALL_SMALL" outlineStyle="NORMAL" alpha="0"/>')
+    ident = 'e1="1" e2="0" e3="0" e4="0" e5="1" e6="0"'
+    return (f'<hp:rect id="0" zOrder="0" numberingType="NONE" textWrap="TOP_AND_BOTTOM" textFlow="BOTH_SIDES" lock="0" '
+            f'dropcapstyle="None" href="" groupLevel="1" instid="{inst}" ratio="0">'
+            f'<hp:offset x="{x}" y="{y}"/><hp:orgSz width="{BOX_UNIT}" height="{BOX_UNIT}"/><hp:curSz width="0" height="0"/>'
+            '<hp:flip horizontal="0" vertical="0"/>'
+            f'<hp:rotationInfo angle="0" centerX="{w // 2}" centerY="{h // 2}" rotateimage="1"/>'
+            f'<hp:renderingInfo><hc:transMatrix e1="1" e2="0" e3="{x}" e4="0" e5="1" e6="{y}"/>'
+            f'<hc:scaMatrix {ident}/><hc:rotMatrix {ident}/>'
+            f'<hc:scaMatrix e1="{_f(w / BOX_UNIT)}" e2="0" e3="0" e4="0" e5="{_f(h / BOX_UNIT)}" e6="0"/>'
+            f'<hc:rotMatrix {ident}/></hp:renderingInfo>'
+            f'{line}'
+            '<hc:fillBrush><hc:winBrush faceColor="#FFFFFF" hatchColor="#000000" alpha="0"/></hc:fillBrush>'
+            '<hp:shadow type="NONE" color="#B2B2B2" offsetX="0" offsetY="0" alpha="0"/>'
+            f'<hp:drawText lastWidth="{last_w}" name="" editable="0">'
+            '<hp:subList id="" textDirection="HORIZONTAL" lineWrap="BREAK" vertAlign="CENTER" linkListIDRef="0" '
+            'linkListNextIDRef="0" textWidth="0" textHeight="0" hasTextRef="0" hasNumRef="0">'
+            f'{paras}</hp:subList><hp:textMargin left="283" right="283" top="283" bottom="283"/></hp:drawText>'
+            f'<hc:pt0 x="0" y="0"/><hc:pt1 x="{BOX_UNIT}" y="0"/><hc:pt2 x="{BOX_UNIT}" y="{BOX_UNIT}"/>'
+            f'<hc:pt3 x="0" y="{BOX_UNIT}"/></hp:rect>')
+
+
+def box_xml(base_id: int, z_order: int, geom, body_paras: str, title_para: str) -> str:
+    """<보기> 묶음 개체. 본문 글상자(테두리 있음)를 title_h/2만큼 내리고, 그 위 빈 자리에 제목 글상자(테두리 없음,
+    흰 배경)를 가로 가운데로 얹어 윗선이 제목 뒤로 끊겨 보이게 한다. 샘플과 다른 점은 위치 기준뿐이다:
+    쪽 기준 절대좌표(PAPER) 대신 문단 기준·글자처럼 취급(PARA)이라 문항 순서가 바뀌어도 따라간다 [제안: 한글 확인 필요]."""
+    w, h = geom.width, geom.height
+    ident = 'e1="1" e2="0" e3="0" e4="0" e5="1" e6="0"'
+    body = _rect_xml(base_id + 1, 0, geom.body_y, w, geom.body_h, True, w, body_paras)
+    title = _rect_xml(base_id + 2, geom.title_x, 0, geom.title_w, geom.title_h, False, geom.title_w, title_para)
+    return (f'<hp:container id="{base_id}" zOrder="{z_order}" numberingType="PICTURE" textWrap="IN_FRONT_OF_TEXT" '
+            f'textFlow="BOTH_SIDES" lock="0" dropcapstyle="None" href="" groupLevel="0" instid="{base_id}">'
+            f'<hp:offset x="0" y="0"/><hp:orgSz width="{w}" height="{h}"/><hp:curSz width="0" height="0"/>'
+            '<hp:flip horizontal="0" vertical="0"/>'
+            f'<hp:rotationInfo angle="0" centerX="{w // 2}" centerY="{h // 2}" rotateimage="1"/>'
+            f'<hp:renderingInfo><hc:transMatrix {ident}/><hc:scaMatrix {ident}/><hc:rotMatrix {ident}/></hp:renderingInfo>'
+            f'{body}{title}'
+            f'<hp:sz width="{w}" widthRelTo="ABSOLUTE" height="{h}" heightRelTo="ABSOLUTE" protect="0"/>'
+            '<hp:pos treatAsChar="1" affectLSpacing="0" flowWithText="0" allowOverlap="1" holdAnchorAndSO="0" '
+            'vertRelTo="PARA" horzRelTo="PARA" vertAlign="TOP" horzAlign="LEFT" vertOffset="0" horzOffset="0"/>'
+            '<hp:outMargin left="0" right="0" top="0" bottom="0"/><hp:shapeComment>묶음 개체입니다.</hp:shapeComment>'
+            '</hp:container>')
+
+
+def table_xml(tbl_id: int, z_order: int, t: TablePart, cells: list) -> str:
+    """표. 샘플(시험지.hwpx)의 hp:tbl 모양을 따르되 위치는 글자처럼 취급(PARA)·쪽 나눔 없음이다 [제안: 한글 확인 필요].
+    cells[r][c]는 칸 안 문단 XML. 칸 크기는 최소값이고 한글이 내용에 맞춰 행 높이를 늘린다."""
+    bid = t.border_id
+    rows = []
+    for r, row in enumerate(cells):
+        tcs = []
+        for c, para in enumerate(row):
+            tcs.append(
+                f'<hp:tc name="" header="0" hasMargin="0" protect="0" editable="0" dirty="0" borderFillIDRef="{bid}">'
+                '<hp:subList id="" textDirection="HORIZONTAL" lineWrap="BREAK" vertAlign="CENTER" linkListIDRef="0" '
+                f'linkListNextIDRef="0" textWidth="0" textHeight="0" hasTextRef="0" hasNumRef="0">{para}</hp:subList>'
+                f'<hp:cellAddr colAddr="{c}" rowAddr="{r}"/><hp:cellSpan colSpan="1" rowSpan="1"/>'
+                f'<hp:cellSz width="{t.col_w[c]}" height="{t.row_h[r]}"/>'
+                '<hp:cellMargin left="510" right="510" top="141" bottom="141"/></hp:tc>')
+        rows.append(f'<hp:tr>{"".join(tcs)}</hp:tr>')
+    return (f'<hp:tbl id="{tbl_id}" zOrder="{z_order}" numberingType="TABLE" textWrap="TOP_AND_BOTTOM" textFlow="BOTH_SIDES" '
+            f'lock="0" dropcapstyle="None" pageBreak="NONE" repeatHeader="0" rowCnt="{len(t.rows)}" colCnt="{len(t.col_w)}" '
+            f'cellSpacing="0" borderFillIDRef="{bid}" noAdjust="0">'
+            f'<hp:sz width="{t.width}" widthRelTo="ABSOLUTE" height="{t.height}" heightRelTo="ABSOLUTE" protect="0"/>'
+            '<hp:pos treatAsChar="1" affectLSpacing="0" flowWithText="1" allowOverlap="0" holdAnchorAndSO="0" '
+            'vertRelTo="PARA" horzRelTo="PARA" vertAlign="TOP" horzAlign="LEFT" vertOffset="0" horzOffset="0"/>'
+            '<hp:outMargin left="0" right="0" top="283" bottom="283"/>'
+            '<hp:inMargin left="510" right="510" top="141" bottom="141"/>'
+            f'{"".join(rows)}</hp:tbl>')
+
+
 class _Ctx:
     """문서 순서대로 수식 id·zOrder를 부여한다(같은 입력 → 같은 바이트)."""
 
@@ -61,6 +149,31 @@ class _Ctx:
         self.base_unit = base_unit
         self.n_eq = 0
         self.n_pic = 0
+        self.n_box = 0
+        self.n_ipara = 0
+        self.n_tbl = 0
+
+    def table(self, t: TablePart) -> str:
+        n = self.n_tbl
+        self.n_tbl += 1
+
+        def para(parts):
+            self.n_ipara += 1
+            return paragraph_xml(BOX_PARA_BASE + self.n_ipara, t.cell_pr, parts, self)
+
+        cells = [[para(parts) for parts in row] for row in t.rows]
+        return table_xml(TBL_ID_BASE + n, TBL_Z_BASE + n, t, cells)
+
+    def box(self, b: BoxPart) -> str:
+        n = self.n_box
+        self.n_box += 1
+
+        def para(pr, parts):
+            self.n_ipara += 1
+            return paragraph_xml(BOX_PARA_BASE + self.n_ipara, pr, parts, self)
+
+        body = "".join(para(b.body_pr, parts) for parts in b.lines)
+        return box_xml(BOX_ID_BASE + 3 * n, BOX_Z_BASE + n, b.geom, body, para(b.title_pr, [b.title]))
 
     def picture(self, p: Picture) -> str:
         n = self.n_pic
@@ -86,7 +199,8 @@ def _runs(parts, ctx: "_Ctx") -> str:
         if buf is not None:
             items.append(f"<hp:t>{buf}</hp:t>")
             buf = None
-        items.append(ctx.picture(p) if isinstance(p, Picture) else ctx.equation(p.script))
+        items.append(ctx.picture(p) if isinstance(p, Picture) else ctx.box(p) if isinstance(p, BoxPart)
+                     else ctx.table(p) if isinstance(p, TablePart) else ctx.equation(p.script))
         if k + 1 >= len(parts) or not isinstance(parts[k + 1], (str, Tab)):
             items.append("<hp:t/>")
     if buf is not None:

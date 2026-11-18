@@ -6,13 +6,17 @@
 - meta에는 문제 내용·이미지를 넣지 않는다. 호출별 사용량은 meta.usage에 두며 usage_events 기록은 B5-3c가 맡는다.
 - GENERATION 설정(thinking 등)은 limits로 받는다. 이 클래스는 정하지 않는다(B5-3b-4b)."""
 from ...export.math.convert import convert
-from ..ports import LlmLimits, ReadResult
+from ..ports import LlmError, LlmLimits, ReadResult
 from . import math_repair
+from .blocks import inlines_of, iter_inlines
 from .check import check_math
-from .content import to_content
+from .content import count_clamped, to_content
 from .read import PROMPT_VERSION as READ_PROMPT, READ_LONG_SIDE, ReadParseError, read_crop
 
 HIGH_LONG_SIDE = 1400
+# 다시 읽기(상위 모델)가 이런 일시적 오류로 실패하면 처음 읽기 모델로 한 번 더 읽는다.
+# 설정 문제(auth·bad_request)나 안전 차단(blocked)은 모델을 바꿔도 소용없으니 그대로 올린다.
+FALLBACK_KINDS = ("timeout", "network", "server", "rate_limit")
 
 
 class ReadEmptyError(ValueError):
@@ -20,11 +24,10 @@ class ReadEmptyError(ValueError):
 
 
 def _is_empty(obj: dict) -> bool:
-    for area in ("stem", "choices"):
-        for p in obj.get(area) or []:
-            for i in p["inlines"]:
-                if (i["v"] if i["t"] == "text" else i["latex"]).strip():
-                    return False
+    for _, cont, key in iter_inlines(obj):
+        for i in inlines_of(cont, key):
+            if (i["v"] if i["t"] == "text" else i["latex"]).strip():
+                return False
     return True
 
 
@@ -34,7 +37,7 @@ def _usage(call: str, model: str, r) -> dict:
 
 
 def _pos(d: dict, *extra) -> dict:
-    return {k: d[k] for k in ("area", "para", "inline") + extra}
+    return {k: d[k] for k in ("area", "para", "p", "r", "c", "inline") + extra if k in d}
 
 
 class RealRecognizer:
@@ -55,6 +58,17 @@ class RealRecognizer:
 
     def read(self, crop: bytes, tier: str = "default") -> ReadResult:
         high = tier == "high"
+        try:
+            return self._read(crop, high, tier)
+        except LlmError as e:
+            if not high or e.kind not in FALLBACK_KINDS or self.model == self.high_model:
+                raise
+            # 상위 모델이 시간 초과 등으로 못 읽었다: 처음 읽기 모델·설정으로 한 번 더. 이것도 실패하면 그대로 올린다.
+            res = self._read(crop, False, "default")
+            res.meta["fallback"] = {"from_model": self.high_model, "reason": e.kind}   # 어떤 모델 결과인지 남긴다(내용 없음)
+            return res
+
+    def _read(self, crop: bytes, high: bool, tier: str) -> ReadResult:
         model = self.high_model if high else self.model
         long_side = self.high_long_side if high else self.long_side
         limits = self.high_limits if high else self.limits
@@ -86,5 +100,8 @@ class RealRecognizer:
             chk = check_math(obj, self.convert_fn)
         meta["math_failed"] = [_pos(f, "error_pos") for f in chk.failures]
         meta["math_warnings"] = [_pos(w, "warnings") for w in chk.warnings]
+        clamped = count_clamped(obj)
+        if clamped:
+            meta["clamped_blocks"] = clamped   # 한계를 넘어 잘린 상자·표 수(없으면 키 없음)
         meta["usage"] = usage
         return ReadResult(content=to_content(obj), meta=meta, points=obj.get("points"), figures=figures)

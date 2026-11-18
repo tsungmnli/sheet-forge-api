@@ -51,6 +51,16 @@ def _preset(p) -> ExportPreset:
 
 
 def _para_id(reg: StyleRegistry, layout: LayoutContext, s: ParagraphSpec) -> int:
+    if s.role == "table":  # 표: 칸 안 문단은 가운데 정렬, 표를 담는 문단도 가운데 정렬
+        b = s.parts[0]
+        b.cell_pr = reg.para(ParaKey("CENTER", False, False))
+        b.border_id = reg.table_border()
+        return reg.para(ParaKey("CENTER", s.keep_with_next, s.keep_lines))
+    if s.role == "box":  # <보기> 상자: 안쪽 본문은 왼쪽 정렬, 제목은 가운데 정렬. 상자를 담는 문단은 왼쪽 정렬
+        b = s.parts[0]
+        b.body_pr = reg.para(ParaKey("LEFT", False, False))
+        b.title_pr = reg.para(ParaKey("CENTER", False, False))
+        return reg.para(ParaKey("LEFT", s.keep_with_next, s.keep_lines))
     if s.role == "choice":  # 선택지 행: 왼쪽 정렬 + 열 균등 탭 정지 [설계 7장]
         tab = reg.tab(layout.col_w, s.tab_cols) if s.tab_cols > 1 else 0
         return reg.para(ParaKey("LEFT", s.keep_with_next, s.keep_lines, tab))
@@ -121,5 +131,7 @@ def export_hwpx(req: ExportRequest) -> ExportResult:
     report.stats.update({"problems": emitted, "figures": len(pics), "paragraphs": len(specs), "text_paragraphs": n_text,
                          "new_para_pr": len(reg.new_para_xml),
                          "equations": n_eq, "equations_wrapped": n_wrapped,
+                         "boxes": sum(1 for s in specs if s.role == "box"),
+                         "tables": sum(1 for s in specs if s.role == "table"),
                          "choice_rows": sum(1 for s in specs if s.role == "choice"), "new_tab_pr": len(reg.new_tab_xml)})
     return ExportResult(data, report, layout.summary())

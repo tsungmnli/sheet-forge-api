@@ -517,6 +517,38 @@ class FlowTest(unittest.TestCase):
         r = self.c.post(f"/problems/{pid}/reread")
         self.assertEqual((r.status_code, r.json()["status"]), (202, "recognizing"))
 
+    def test_read_failure_shows_reason_and_refunds_quota(self):
+        exam_id, page_id, segs = self._setup(2, daily_read_limit=2)
+        self._read(exam_id)                                          # 2칸 = 2 차감(한도 가득)
+        self._work(2, recognizer=Boom(), max_attempts=1)             # 둘 다 끝내 실패 → 2 돌려받음
+        pid = self._problem_ids(exam_id)[0]
+        p = self._get(pid)
+        self.assertEqual(p["status"], "failed")
+        self.assertTrue(p["fail_reason"])                            # 왜 실패했는지 쉬운 문장
+        items = self.c.get(f"/exams/{exam_id}/problems").json()["items"]
+        self.assertTrue(all(i["fail_reason"] for i in items if i["state"] == "failed"))
+        r = self.c.post(f"/problems/{pid}/reread")                   # 환불이 없었다면 429 READ_LIMIT
+        self.assertEqual((r.status_code, r.json()["status"]), (202, "recognizing"))
+        self.assertIsNone(r.json()["fail_reason"])                   # 읽는 중에는 사유를 보이지 않는다
+
+    def test_reread_failure_keeps_previous_result_and_refunds(self):
+        exam_id, page_id, segs = self._setup(1, daily_read_limit=3)
+        self._read(exam_id)                                          # 1
+        self._work(1)
+        pid = self._problem_ids(exam_id)[0]
+        before = self._get(pid)
+        self.assertEqual(before["status"], "needs_review")
+        self.assertIsNone(before["fail_reason"])
+        self.assertEqual(self.c.post(f"/problems/{pid}/reread").status_code, 202)   # +2 = 3
+        self._work(1, recognizer=Boom(), max_attempts=1)             # 다시 읽기만 실패 → 2 돌려받음
+        p = self._get(pid)
+        self.assertEqual(p["status"], "needs_review")                # 비운 실패 상태가 아니라 이전 결과 그대로
+        self.assertEqual(p["content"]["stem"], before["content"]["stem"])
+        self.assertTrue(p["fail_reason"])
+        self.assertEqual(self.c.post(f"/problems/{pid}/reread").status_code, 202)   # 환불이 없었다면 429
+        self._work(1)                                                # 이번엔 성공 → 사유가 사라진다
+        self.assertIsNone(self._get(pid)["fail_reason"])
+
     def test_problem_deleted_while_reading(self):
         exam_id, page_id, segs = self._setup(1)
         self._read(exam_id)

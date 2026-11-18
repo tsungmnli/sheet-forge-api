@@ -16,7 +16,7 @@ from .segment import shrink_for_segment
 
 log = logging.getLogger("sheet_forge.recognition")
 
-PROMPT_VERSION = "read_v4"
+PROMPT_VERSION = "read_v5"
 PROMPT_PATH = Path(__file__).resolve().parent.parent / "prompts" / (PROMPT_VERSION + ".md")
 READ_LONG_SIDE = 1000       # 설계 6.1: 크롭을 긴 변 약 1,000px로(작으면 확대하지 않는다)
 DEFAULT_MAX_OUTPUT = 4096   # 설계는 약 2,000. 추론 설정(B5-3b)이 정해지기 전이라 넉넉히 둔다
@@ -89,6 +89,35 @@ def _paragraphs(v):
     return out
 
 
+def _block(b):
+    """stem 블록 하나. type이 없거나 paragraph이면 {"inlines"} 그대로(기존 모양), box·table은 type을 단 채로 돌려준다.
+    내용이 없는 상자·표는 None(버린다). 모르는 type은 bad_shape."""
+    if not isinstance(b, dict):
+        raise ReadParseError("bad_shape")
+    t = b.get("type")
+    if t is None or t == "paragraph":
+        return {"inlines": _inlines(b.get("inlines"))}
+    if t == "box":
+        title = b.get("title")
+        if title is not None and not isinstance(title, str):
+            raise ReadParseError("bad_shape")
+        paras = _paragraphs(b.get("paragraphs"))
+        return {"type": "box", "title": title, "paragraphs": paras} if paras else None
+    if t == "table":
+        rows = b.get("rows")
+        if not isinstance(rows, list) or not all(isinstance(r, list) for r in rows):
+            raise ReadParseError("bad_shape")
+        rows = [[_inlines(c) for c in r] for r in rows]
+        return {"type": "table", "rows": rows} if any(rows) else None
+    raise ReadParseError("bad_shape")
+
+
+def _blocks(v):
+    if not isinstance(v, list):
+        raise ReadParseError("bad_shape")
+    return [x for x in (_block(b) for b in v) if x is not None]
+
+
 def _figure(f):
     box = f.get("box_2d") if isinstance(f, dict) else None
     if not isinstance(box, (list, tuple)) or len(box) != 4:
@@ -112,6 +141,7 @@ def _points(v):
 
 def parse_read_json(text: str) -> dict:
     """LLM 출력(JSON 문자열) -> {"stem","choices","figures","uncertain","unsupported_block","points"}.
+    stem은 문단({"inlines"}, 기존 모양 그대로)과 type이 box·table인 블록의 목록이다. 내용 없는 상자·표는 버린다.
     stem·choices의 형태가 틀리면 ReadParseError. 빠진 선택 필드는 기본값으로 채우고, 좌표가 틀린 그림 항목은 버린다."""
     data = _loads(text)
     if not isinstance(data, dict) or not isinstance(data.get("stem"), list):
@@ -121,7 +151,7 @@ def parse_read_json(text: str) -> dict:
     uncertain = data.get("uncertain")
     block = data.get("unsupported_block")
     out = {
-        "stem": _paragraphs(data["stem"]),
+        "stem": _blocks(data["stem"]),
         "choices": None if choices is None else _paragraphs(choices),
         "figures": [f for f in (_figure(x) for x in figures) if f] if isinstance(figures, list) else [],
         "uncertain": [{"where": str(u.get("where", "")), "reason": str(u.get("reason", ""))}

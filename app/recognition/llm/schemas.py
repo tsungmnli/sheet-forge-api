@@ -23,10 +23,20 @@ _PARAGRAPHS = {"type": "array", "items": {"type": "object",
                                           "properties": {"inlines": {"type": "array", "items": _INLINE}},
                                           "required": ["inlines"]}}
 
+# stem 블록: type이 paragraph면 inlines, box면 title·paragraphs, table이면 rows만 쓴다(나머지는 생략). 표는 행 -> 칸 -> 조각 목록.
+_INLINES = {"type": "array", "items": _INLINE}
+_BLOCK = {"type": "object",
+          "properties": {"type": {"type": "string", "enum": ["paragraph", "box", "table"]},
+                         "inlines": _INLINES,
+                         "title": {"type": "string", "nullable": True},
+                         "paragraphs": _PARAGRAPHS,
+                         "rows": {"type": "array", "items": {"type": "array", "items": _INLINES}}},
+          "required": ["type"]}
+
 READ_SCHEMA = {
     "type": "object",
     "properties": {
-        "stem": _PARAGRAPHS,
+        "stem": {"type": "array", "items": _BLOCK},
         "choices": dict(_PARAGRAPHS, nullable=True),
         "figures": {"type": "array", "items": {
             "type": "object",

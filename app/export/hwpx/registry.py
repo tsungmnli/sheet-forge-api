@@ -22,6 +22,7 @@ class TabKey(NamedTuple):
 
 
 _TAB_ID_RE = re.compile(r'<hh:tabPr id="(\d+)"')
+_BORDER_ID_RE = re.compile(r'<hh:borderFill id="(\d+)"')
 _PARA0_RE = re.compile(r'<hh:paraPr id="0" .*?</hh:paraPr>', re.S)
 _PARA_ID_RE = re.compile(r'<hh:paraPr id="(\d+)"')
 
@@ -74,6 +75,27 @@ class StyleRegistry:
         self._first_tab_id = max(ids) + 1
         self._tab_ids: dict = {}
         self._tab_xml: list = []
+        bids = [int(x) for x in _BORDER_ID_RE.findall(header_xml)]
+        if not bids:
+            raise TemplateError("header.xml에 borderFill이 없음")
+        self._first_border_id = max(bids) + 1
+        self._border_id = None
+
+    def table_border(self) -> int:
+        """표 네 면 실선(0.12mm) borderFill. 템플릿에는 없으므로 처음 쓸 때 새로 추가한다(샘플 시험지.hwpx의 id 3과 같은 모양)."""
+        if self._border_id is None:
+            self._border_id = self._first_border_id
+        return self._border_id
+
+    @property
+    def new_border_xml(self) -> list:
+        if self._border_id is None:
+            return []
+        side = 'type="SOLID" width="0.12 mm" color="#000000"'
+        return [f'<hh:borderFill id="{self._border_id}" threeD="0" shadow="0" centerLine="NONE" breakCellSeparateLine="0">'
+                '<hh:slash type="NONE" Crooked="0" isCounter="0"/><hh:backSlash type="NONE" Crooked="0" isCounter="0"/>'
+                f'<hh:leftBorder {side}/><hh:rightBorder {side}/><hh:topBorder {side}/><hh:bottomBorder {side}/>'
+                '<hh:diagonal type="SOLID" width="0.1 mm" color="#000000"/></hh:borderFill>']
 
     def tab(self, line_w: int, n_cols: int) -> int:
         """열 균등 분할 탭 정지: 위치 = round(줄 폭 × k ÷ n), k = 1…n-1 [검증 t12c, 설계 9장 4]."""

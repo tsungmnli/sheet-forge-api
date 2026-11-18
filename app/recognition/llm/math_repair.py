@@ -9,6 +9,7 @@ from pathlib import Path
 
 from ...export.math.convert import convert
 from ..ports import LlmError, LlmLimits
+from .blocks import inline_at
 from .read import ReadParseError, _loads, vocab_text
 from .repair import _CTRL, _CTRL_RE
 
@@ -77,7 +78,7 @@ def repair_math(client, model: str, obj: dict, failures: list, *, limits: LlmLim
         if not ok:
             continue
         f = failures[i]
-        new[f["area"]][f["para"]]["inlines"][f["inline"]]["latex"] = latex
+        inline_at(new, f)["latex"] = latex
         done.add(i)
     remaining = [f for i, f in enumerate(failures) if i not in done]
     return RepairOutcome(new, result, len(done), remaining, None)

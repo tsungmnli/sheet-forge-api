@@ -38,6 +38,7 @@ class Settings:
     read_model: str = "gemini-3.5-flash-lite"
     reread_model: str = "gemini-3.8-flash"
     llm_timeout_s: int = 30
+    reread_timeout_s: int = 90   # 다시 읽기는 상위 모델·큰 크롭이라 오래 걸린다(기본 읽기의 30초로는 자주 모자란다)
     recognition_engine: str = "fake"   # B5-2c: fake | real. real이면 보정·분할에 실제 구현을 쓴다(LLM_API_KEY 필요)
     segment_image_long_side: int = 1500  # 분할 호출에 보내는 이미지의 긴 변(px)
     # 로그인: auth_required가 꺼져 있으면 지금처럼 default_owner_id 한 명으로 동작한다(개발·테스트). 운영은 켠다.
@@ -98,6 +99,7 @@ class Settings:
                    read_model=text("READ_MODEL", d.read_model),
                    reread_model=text("REREAD_MODEL", d.reread_model),
                    llm_timeout_s=num("LLM_TIMEOUT_S", d.llm_timeout_s),
+                   reread_timeout_s=num("REREAD_TIMEOUT_S", d.reread_timeout_s),
                    recognition_engine=text("RECOGNITION_ENGINE", d.recognition_engine).strip().lower(),
                    segment_image_long_side=num("SEGMENT_IMAGE_LONG_SIDE", d.segment_image_long_side),
                    auth_required=flag("AUTH_REQUIRED", d.auth_required),

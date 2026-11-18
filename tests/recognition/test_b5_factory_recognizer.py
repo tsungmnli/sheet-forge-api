@@ -59,6 +59,12 @@ class BuildTest(unittest.TestCase):
         self.assertEqual(l1.generation_extra, {"thinkingConfig": {"thinkingLevel": "minimal"}})
         self.assertEqual(l2.generation_extra, {"thinkingConfig": {"thinkingBudget": 0}})
 
+    def test_reread_has_its_own_timeout(self):
+        r = build_recognizer(Settings(recognition_engine="real", llm_api_key="k", llm_timeout_s=20, reread_timeout_s=70),
+                             client=FakeClient())
+        self.assertEqual((r.limits.timeout_s, r.high_limits.timeout_s), (20.0, 70.0))   # 다시 읽기는 상위 모델이라 더 길게
+        self.assertEqual(Settings().reread_timeout_s, 90)
+
     def test_high_limits_default_to_limits(self):
         c = FakeClient()
         r = RealRecognizer(c, "a", "b")

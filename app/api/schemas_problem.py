@@ -4,7 +4,7 @@ problem_view()가 만드는 dict와 키가 같다. content는 ContentOut으로 �
 """
 from typing import Annotated, Any, Literal, Union
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_serializer
 
 ProblemStatus = Literal["recognizing", "needs_review", "confirmed", "failed"]
 
@@ -51,9 +51,27 @@ class ImageInlineOut(_OpenOut):
 InlineOut = Annotated[Union[TextInlineOut, MathInlineOut, ImageInlineOut], Field(discriminator="t")]
 
 
+class BoxLineOut(_OpenOut):
+    inlines: list[InlineOut] = []
+
+
 class StemBlockOut(_OpenOut):
+    """type: paragraph(inlines) · box(title, paragraphs) · table(rows: 행 → 칸 → 조각 목록)."""
     type: str = "paragraph"
     inlines: list[InlineOut] = []
+    title: str | None = None
+    paragraphs: list[BoxLineOut] | None = None
+    rows: list[list[list[InlineOut]]] | None = None
+
+    @model_serializer(mode="wrap")
+    def _tidy(self, handler):
+        d = handler(self)
+        for k in ("title", "paragraphs", "rows"):
+            if d.get(k) is None:
+                d.pop(k, None)
+        if d.get("type") in ("box", "table") and not d.get("inlines"):
+            d.pop("inlines", None)
+        return d
 
 
 class ChoicesOut(_OpenOut):
@@ -126,6 +144,7 @@ class ProblemOut(BaseModel):
     hints: list[HintOut]
     removed_figures: list[RemovedFigureOut] = []   # 지웠지만 되살릴 수 있는 그림
     checks: ChecksOut
+    fail_reason: str | None = None                 # 읽기에 실패했을 때만: 왜 실패했는지 쉬운 문장
     poll_after_ms: int | None = None
 
 
@@ -175,6 +194,7 @@ class ProblemListItemOut(BaseModel):
     preview: str
     preview_tex: str = ""
     badges: list[str]
+    fail_reason: str | None = None                 # state가 failed일 때만
 
 
 class ProblemListOut(BaseModel):

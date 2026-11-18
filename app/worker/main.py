@@ -18,6 +18,7 @@ from ..db.models import Page, Segment
 from ..recognition.factory import build_cleaner, build_processor, build_recognizer
 from ..recognition.fake import FakeFigureCleaner, FakePageProcessor
 from ..recognition.llm.read import ReadParseError
+from ..recognition.ports import LlmError
 from ..recognition.usage import llm_event, record_job_usage
 from ..storage.images import StorageError, build_store
 from . import maintenance
@@ -95,8 +96,8 @@ def run_once(db, store, processor, max_attempts: int = MAX_ATTEMPTS, retry_delay
         jobs.complete(db, job.id)
     except Exception as exc:  # noqa: BLE001
         code = type(exc).__name__
-        if isinstance(exc, ReadParseError):
-            code = f"{code}({exc})"  # 종류와 토큰 수만 담긴 메시지
+        if isinstance(exc, (ReadParseError, LlmError)):
+            code = f"{code}({exc})"  # 종류(와 상태 코드·토큰 수)만 담긴 메시지
         log.error("작업 실패 kind=%s target=%s attempts=%d %s", job.kind, job.target_id, job.attempts, code)
         final = job.attempts >= max_attempts or isinstance(exc, UnknownJob)
         if final:
@@ -109,7 +110,7 @@ def run_once(db, store, processor, max_attempts: int = MAX_ATTEMPTS, retry_delay
             else:
                 _set_page_processing(db, job.target_id, {"state": "queued", "step": "correcting", "message": None})
         elif final and job.kind in problem_jobs.KINDS:
-            problem_jobs.mark_failed(db, job)
+            problem_jobs.mark_failed(db, job, exc)
     return True
 
 

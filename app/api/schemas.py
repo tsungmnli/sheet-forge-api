@@ -1,7 +1,7 @@
 """요청 모델 (설계 4장). 문항은 라이브러리가 읽는 필드만 구조를 검사하고, 나머지 필드는 그대로 통과시킨다."""
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_serializer
 
 from .preset_shape import PresetValue
 
@@ -17,9 +17,27 @@ class InlineIn(_Loose):
     breaks: list[int] | None = None
 
 
+class BoxLineIn(_Loose):
+    inlines: list[InlineIn] = Field(default_factory=list)
+
+
 class StemBlockIn(_Loose):
+    """type: paragraph(inlines) · box(title, paragraphs) · table(rows: 행 → 칸 → 조각 목록)."""
     type: str = "paragraph"
     inlines: list[InlineIn] = Field(default_factory=list)
+    title: str | None = None
+    paragraphs: list[BoxLineIn] | None = None
+    rows: list[list[list[InlineIn]]] | None = None
+
+    @model_serializer(mode="wrap")
+    def _tidy(self, handler):
+        d = handler(self)
+        for k in ("title", "paragraphs", "rows"):
+            if d.get(k) is None:
+                d.pop(k, None)
+        if d.get("type") in ("box", "table") and not d.get("inlines"):
+            d.pop("inlines", None)
+        return d
 
 
 class ChoicesIn(_Loose):
