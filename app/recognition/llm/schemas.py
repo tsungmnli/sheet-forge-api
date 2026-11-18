@@ -23,15 +23,23 @@ _PARAGRAPHS = {"type": "array", "items": {"type": "object",
                                           "properties": {"inlines": {"type": "array", "items": _INLINE}},
                                           "required": ["inlines"]}}
 
-# stem 블록: type이 paragraph면 inlines, box면 title·paragraphs, table이면 rows만 쓴다(나머지는 생략). 표는 행 -> 칸 -> 조각 목록.
+# stem 블록: 종류(type)별로 필수 필드가 다르다. anyOf로 나눠서 "paragraphs 없는 box", "inlines 없는 paragraph" 같은 모양을
+# 스키마 단계에서 막는다(프롬프트·파서로 뒤에서 고치지 않는다). 표는 행 -> 칸 -> 조각 목록.
 _INLINES = {"type": "array", "items": _INLINE}
-_BLOCK = {"type": "object",
-          "properties": {"type": {"type": "string", "enum": ["paragraph", "box", "table"]},
-                         "inlines": _INLINES,
-                         "title": {"type": "string", "nullable": True},
-                         "paragraphs": _PARAGRAPHS,
-                         "rows": {"type": "array", "items": {"type": "array", "items": _INLINES}}},
-          "required": ["type"]}
+_BLOCK = {"anyOf": [
+    {"type": "object",
+     "properties": {"type": {"type": "string", "enum": ["paragraph"]}, "inlines": _INLINES},
+     "required": ["type", "inlines"]},
+    {"type": "object",
+     "properties": {"type": {"type": "string", "enum": ["box"]},
+                    "title": {"type": "string", "nullable": True},
+                    "paragraphs": _PARAGRAPHS},
+     "required": ["type", "title", "paragraphs"]},
+    {"type": "object",
+     "properties": {"type": {"type": "string", "enum": ["table"]},
+                    "rows": {"type": "array", "items": {"type": "array", "items": _INLINES}}},
+     "required": ["type", "rows"]},
+]}
 
 READ_SCHEMA = {
     "type": "object",

@@ -66,8 +66,29 @@ class FallbackTest(unittest.TestCase):
             c = FakeClient(LlmError(kind), read_json(T("값")))
             self.assertEqual(rec(c).read(png(600, 400), "high").meta["fallback"]["reason"], kind)
 
-    def test_no_fallback_for_config_or_blocked_errors(self):
-        for kind in ("auth", "bad_request", "blocked"):
+    def test_blocked_falls_back_to_the_other_model(self):
+        c = FakeClient(LlmError("blocked", detail="RECITATION"), read_json(T("값")))
+        r = rec(c).read(png(600, 400), "high")                                  # 다시 읽기가 막히면 처음 읽기 모델로
+        self.assertEqual(r.meta["fallback"], {"from_model": "flash", "reason": "blocked"})
+        self.assertEqual([call[0] for call in c.calls], ["flash", "lite"])
+        c = FakeClient(LlmError("blocked"), read_json(T("값")))
+        r = rec(c).read(png(600, 400))                                          # 처음 읽기가 막히면 상위 모델로
+        self.assertEqual(r.meta["fallback"], {"from_model": "lite", "reason": "blocked"})
+        self.assertEqual((r.meta["model"], r.meta["tier"]), ("flash", "high"))
+        self.assertEqual([call[0] for call in c.calls], ["lite", "flash"])
+
+    def test_blocked_on_both_models_or_same_model_is_raised(self):
+        c = FakeClient(LlmError("blocked"), LlmError("blocked", detail="SAFETY"))
+        with self.assertRaises(LlmError):
+            rec(c).read(png(600, 400))
+        self.assertEqual(len(c.calls), 2)                                       # 한 번만 바꿔 본다
+        c = FakeClient(LlmError("blocked"), read_json(T("값")))
+        with self.assertRaises(LlmError):
+            RealRecognizer(c, "same", convert_fn=conv).read(png(600, 400))
+        self.assertEqual(len(c.calls), 1)
+
+    def test_no_fallback_for_config_errors(self):
+        for kind in ("auth", "bad_request"):
             c = FakeClient(LlmError(kind), read_json(T("값")))
             with self.assertRaises(LlmError):
                 rec(c).read(png(600, 400), "high")
@@ -100,7 +121,7 @@ class ReadTest(unittest.TestCase):
         self.assertEqual(r.content["choices"], {"items": [[{"t": "math", "latex": "3"}]], "layout": "auto"})
         self.assertEqual(r.content["figures"], [])
         m = r.meta
-        self.assertEqual((m["engine"], m["tier"], m["model"], m["prompt"], m["retried"]), ("llm", "default", "lite", "read_v5", False))
+        self.assertEqual((m["engine"], m["tier"], m["model"], m["prompt"], m["retried"]), ("llm", "default", "lite", "read_v6", False))
         self.assertEqual((m["math_repaired"], m["math_failed"], m["math_warnings"]), (0, [], []))
         self.assertEqual([u["call"] for u in m["usage"]], ["read"])
         self.assertNotIn("값을", json.dumps(m, ensure_ascii=False))

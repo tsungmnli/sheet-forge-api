@@ -99,7 +99,9 @@ def run_once(db, store, processor, max_attempts: int = MAX_ATTEMPTS, retry_delay
         if isinstance(exc, (ReadParseError, LlmError)):
             code = f"{code}({exc})"  # 종류(와 상태 코드·토큰 수)만 담긴 메시지
         log.error("작업 실패 kind=%s target=%s attempts=%d %s", job.kind, job.target_id, job.attempts, code)
-        final = job.attempts >= max_attempts or isinstance(exc, UnknownJob)
+        # 안전·저작물 차단은 같은 사진으로 다시 해도 같다(모델 바꿔 읽기는 인식기 안에서 이미 해 봤다).
+        final = (job.attempts >= max_attempts or isinstance(exc, UnknownJob)
+                 or (isinstance(exc, LlmError) and exc.kind == "blocked"))
         if final:
             jobs.fail(db, job.id, code)
         else:

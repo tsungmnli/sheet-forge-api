@@ -86,6 +86,42 @@ class LlmClientTest(unittest.TestCase):
             c.generate("m", None, "p", None, LlmLimits())
         self.assertEqual((e.exception.kind, len(self.script.calls)), ("timeout", 1))
 
+    def test_safety_settings_sent_by_default_and_can_be_turned_off(self):
+        self.client((200, {}, OK)).generate("m", None, "p", None, LlmLimits())
+        ss = self.script.calls[0][2]["safetySettings"]
+        self.assertEqual({x["threshold"] for x in ss}, {"BLOCK_NONE"})
+        self.assertEqual(len(ss), 4)
+        c = GeminiClient("K", transport=Script((200, {}, OK)), safety_threshold="")
+        c.generate("m", None, "p", None, LlmLimits())
+        self.assertNotIn("safetySettings", c._transport.calls[0][2])
+
+    def test_blocked_carries_detail_name_only(self):
+        cases = [({"promptFeedback": {"blockReason": "OTHER"}}, "OTHER"),
+                 ({"candidates": [{"finishReason": "SAFETY", "content": {"parts": []}}]}, "SAFETY"),
+                 ({"candidates": [{"finishReason": "PROHIBITED_CONTENT", "content": {"parts": []}}]}, "PROHIBITED_CONTENT"),
+                 ({"promptFeedback": {"blockReason": "문제 내용이 섞인 값"}}, "OTHER")]
+        for data, detail in cases:
+            with self.assertRaises(LlmError) as e:
+                self.client((200, {}, data)).generate("m", None, "p", None, LlmLimits())
+            self.assertEqual((e.exception.kind, e.exception.detail), ("blocked", detail))
+        self.assertEqual(str(e.exception), "blocked:OTHER")
+
+    def test_recitation_retried_once_with_higher_temperature(self):
+        rec = {"candidates": [{"finishReason": "RECITATION", "content": {"parts": []}}]}
+        r = self.client((200, {}, rec), (200, {}, OK)).generate("m", None, "p", None, LlmLimits(temperature=0.0))
+        self.assertEqual(r.text, "{\"problems\": []}")
+        temps = [call[2]["generationConfig"]["temperature"] for call in self.script.calls]
+        self.assertEqual(temps, [0.0, 0.7])
+        with self.assertRaises(LlmError) as e:   # 또 막히면 더 부르지 않는다
+            self.client((200, {}, rec), (200, {}, rec)).generate("m", None, "p", None, LlmLimits())
+        self.assertEqual((e.exception.detail, len(self.script.calls)), ("RECITATION", 2))
+
+    def test_other_blocks_are_not_retried(self):
+        data = {"candidates": [{"finishReason": "SAFETY", "content": {"parts": []}}]}
+        with self.assertRaises(LlmError):
+            self.client((200, {}, data), (200, {}, OK)).generate("m", None, "p", None, LlmLimits())
+        self.assertEqual(len(self.script.calls), 1)
+
     def test_empty_blocked_and_bad_response(self):
         cases = [({"candidates": []}, "empty"), ({"promptFeedback": {"blockReason": "SAFETY"}}, "blocked"),
                  ({"candidates": [{"finishReason": "SAFETY", "content": {"parts": []}}]}, "blocked"),

@@ -131,7 +131,7 @@ class ReadCropTest(unittest.TestCase):
     def test_schema_requires_all_top_level_fields(self):
         self.assertEqual(READ_SCHEMA["required"], ["stem", "choices", "figures", "uncertain", "unsupported_block", "points"])
         self.assertTrue(READ_SCHEMA["properties"]["choices"]["nullable"])
-        self.assertEqual(READ_SCHEMA["properties"]["stem"]["items"]["properties"]["inlines"]["items"]["required"],
+        self.assertEqual(READ_SCHEMA["properties"]["stem"]["items"]["anyOf"][0]["properties"]["inlines"]["items"]["required"],
                          ["t", "v", "latex"])
 
 

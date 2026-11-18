@@ -86,6 +86,9 @@ def restore(session, owner: str, type_: str, obj_id: str) -> dict:
         if session.execute(select(Problem.id).where(Problem.segment_id == seg.id, Problem.deleted_at.is_(None))).first():
             raise ApiError(409, "SEGMENT_HAS_PROBLEM", "이 칸은 이미 다시 읽은 문제가 있어요. 그 문제를 지우면 이 문제를 복구할 수 있어요.")
     restored[type_] = _revive(session, model, model.id == obj_id)
+    if type_ == "problem" and not seg.marked:
+        seg.marked = True
+        seg.updated_at = func.now()
     if exam_id and type_ != "exam":
         session.execute(update(Exam).where(Exam.id == exam_id).values(updated_at=func.now()))
     session.commit()

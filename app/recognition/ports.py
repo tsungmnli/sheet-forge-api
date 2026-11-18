@@ -78,11 +78,13 @@ class LlmResult:
 
 class LlmError(Exception):
     """kind: timeout | network | rate_limit | server | bad_request | auth | blocked | empty | bad_response.
-    메시지에는 종류와 상태 코드만 담는다(응답 본문·키·문제 내용 없음)."""
+    메시지에는 종류와 상태 코드만 담는다(응답 본문·키·문제 내용 없음).
+    detail: 공급자가 알려 준 차단 종류 이름(SAFETY·RECITATION 등 대문자 상수만). blocked일 때만 있다."""
 
-    def __init__(self, kind: str, status: int | None = None):
-        super().__init__(kind if status is None else f"{kind}({status})")
-        self.kind, self.status = kind, status
+    def __init__(self, kind: str, status: int | None = None, detail: str | None = None):
+        msg = kind if status is None else f"{kind}({status})"
+        super().__init__(msg if detail is None else f"{msg}:{detail}")
+        self.kind, self.status, self.detail = kind, status, detail
 
 
 class LlmClient(Protocol):

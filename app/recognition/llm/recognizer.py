@@ -15,7 +15,8 @@ from .read import PROMPT_VERSION as READ_PROMPT, READ_LONG_SIDE, ReadParseError,
 
 HIGH_LONG_SIDE = 1400
 # 다시 읽기(상위 모델)가 이런 일시적 오류로 실패하면 처음 읽기 모델로 한 번 더 읽는다.
-# 설정 문제(auth·bad_request)나 안전 차단(blocked)은 모델을 바꿔도 소용없으니 그대로 올린다.
+# 설정 문제(auth·bad_request)는 모델을 바꿔도 소용없으니 그대로 올린다.
+# 안전·저작물 판정(blocked)은 모델마다 달라서, 반대편 모델로 한 번 더 읽어 본다.
 FALLBACK_KINDS = ("timeout", "network", "server", "rate_limit")
 
 
@@ -61,11 +62,18 @@ class RealRecognizer:
         try:
             return self._read(crop, high, tier)
         except LlmError as e:
-            if not high or e.kind not in FALLBACK_KINDS or self.model == self.high_model:
+            if self.model == self.high_model:
                 raise
-            # 상위 모델이 시간 초과 등으로 못 읽었다: 처음 읽기 모델·설정으로 한 번 더. 이것도 실패하면 그대로 올린다.
-            res = self._read(crop, False, "default")
-            res.meta["fallback"] = {"from_model": self.high_model, "reason": e.kind}   # 어떤 모델 결과인지 남긴다(내용 없음)
+            if high and e.kind in FALLBACK_KINDS:
+                # 상위 모델이 시간 초과 등으로 못 읽었다: 처음 읽기 모델·설정으로 한 번 더. 이것도 실패하면 그대로 올린다.
+                res, frm = self._read(crop, False, "default"), self.high_model
+            elif e.kind == "blocked":
+                # 처음 읽기가 막히면 상위 모델·큰 크롭으로, 다시 읽기가 막히면 처음 읽기 모델로 한 번 더.
+                res = self._read(crop, not high, "default" if high else "high")
+                frm = self.high_model if high else self.model
+            else:
+                raise
+            res.meta["fallback"] = {"from_model": frm, "reason": e.kind}   # 어떤 모델 결과인지 남긴다(내용 없음)
             return res
 
     def _read(self, crop: bytes, high: bool, tier: str) -> ReadResult:

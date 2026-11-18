@@ -38,6 +38,7 @@ class Settings:
     read_model: str = "gemini-3.5-flash-lite"
     reread_model: str = "gemini-3.8-flash"
     llm_timeout_s: int = 30
+    llm_safety_threshold: str = "BLOCK_NONE"   # Gemini 안전 필터 수준. BLOCK_NONE(끔)·BLOCK_ONLY_HIGH·BLOCK_MEDIUM_AND_ABOVE… 비우면 공급자 기본
     reread_timeout_s: int = 90   # 다시 읽기는 상위 모델·큰 크롭이라 오래 걸린다(기본 읽기의 30초로는 자주 모자란다)
     recognition_engine: str = "fake"   # B5-2c: fake | real. real이면 보정·분할에 실제 구현을 쓴다(LLM_API_KEY 필요)
     segment_image_long_side: int = 1500  # 분할 호출에 보내는 이미지의 긴 변(px)
@@ -99,6 +100,7 @@ class Settings:
                    read_model=text("READ_MODEL", d.read_model),
                    reread_model=text("REREAD_MODEL", d.reread_model),
                    llm_timeout_s=num("LLM_TIMEOUT_S", d.llm_timeout_s),
+                   llm_safety_threshold=text("LLM_SAFETY_THRESHOLD", d.llm_safety_threshold).strip().upper(),
                    reread_timeout_s=num("REREAD_TIMEOUT_S", d.reread_timeout_s),
                    recognition_engine=text("RECOGNITION_ENGINE", d.recognition_engine).strip().lower(),
                    segment_image_long_side=num("SEGMENT_IMAGE_LONG_SIDE", d.segment_image_long_side),

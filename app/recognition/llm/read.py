@@ -16,7 +16,7 @@ from .segment import shrink_for_segment
 
 log = logging.getLogger("sheet_forge.recognition")
 
-PROMPT_VERSION = "read_v5"
+PROMPT_VERSION = "read_v6"
 PROMPT_PATH = Path(__file__).resolve().parent.parent / "prompts" / (PROMPT_VERSION + ".md")
 READ_LONG_SIDE = 1000       # 설계 6.1: 크롭을 긴 변 약 1,000px로(작으면 확대하지 않는다)
 DEFAULT_MAX_OUTPUT = 4096   # 설계는 약 2,000. 추론 설정(B5-3b)이 정해지기 전이라 넉넉히 둔다
@@ -101,7 +101,12 @@ def _block(b):
         title = b.get("title")
         if title is not None and not isinstance(title, str):
             raise ReadParseError("bad_shape")
-        paras = _paragraphs(b.get("paragraphs"))
+        # 제목이 아닌 것(줄바꿈이 든 긴 글)이 title에 들어갔으면 내용이 샌 것이다 -> 다시 읽게 한다
+        if isinstance(title, str) and (len(title) > 30 or "\n" in title or "\\n" in title):
+            raise ReadParseError("bad_shape")
+        paras = _paragraphs(b.get("paragraphs") or [])
+        if not paras and isinstance(title, str) and title.strip():
+            raise ReadParseError("bad_shape")   # 제목만 있고 줄이 없는 상자(내용 유실)는 조용히 버리지 않고 다시 읽게 한다
         return {"type": "box", "title": title, "paragraphs": paras} if paras else None
     if t == "table":
         rows = b.get("rows")
@@ -111,11 +116,24 @@ def _block(b):
         return {"type": "table", "rows": rows} if any(rows) else None
     raise ReadParseError("bad_shape")
 
+def _merge_split_boxes(v):
+    """모델이 <보기> 상자를 '제목만 있는 box'  '제목 없는 box'로 쪼개 내면 하나로 합친다(제목은 앞 블록에서 가져온다)."""
+    out = []
+    for b in v:
+        prev = out[-1] if out else None
+        if (isinstance(b, dict) and b.get("type") == "box" and b.get("title") is None and b.get("paragraphs")
+                and isinstance(prev, dict) and prev.get("type") == "box" and isinstance(prev.get("title"), str)
+                and not prev.get("paragraphs")):
+            out[-1] = dict(b, title=prev["title"])
+        else:
+            out.append(b)
+    return out
+
 
 def _blocks(v):
     if not isinstance(v, list):
         raise ReadParseError("bad_shape")
-    return [x for x in (_block(b) for b in v) if x is not None]
+    return [x for x in (_block(b) for b in _merge_split_boxes(v)) if x is not None]
 
 
 def _figure(f):

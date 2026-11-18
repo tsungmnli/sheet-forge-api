@@ -425,6 +425,26 @@ class FlowTest(unittest.TestCase):
         self._pick(page_id, segs[0]["id"])
         self.assertEqual(self._read(exam_id)["requested"], 1)                           # 다시 읽기 시작 가능
 
+    def test_delete_problem_with_unpick_leaves_list_and_next_read(self):
+        exam_id, page_id, segs, pid = self._read_one()
+        self.assertEqual(self.c.delete(f"/problems/{pid}?unpick=true").status_code, 204)
+        self.assertEqual(self.c.get(f"/exams/{exam_id}/problems").json()["items"], [])   # 목록에서 빠진다
+        self.assertEqual(self._read(exam_id)["requested"], 0)                            # 다시 읽히지 않는다
+
+    def test_plain_delete_keeps_segment_picked(self):
+        exam_id, page_id, segs, pid = self._read_one()
+        self.assertEqual(self.c.delete(f"/problems/{pid}").status_code, 204)
+        items = self.c.get(f"/exams/{exam_id}/problems").json()["items"]
+        self.assertEqual([i["problem_id"] for i in items], [None])                      # 기존 동작: 칸은 그대로 고른 상태
+
+    def test_restore_problem_deleted_with_unpick_repicks_segment(self):
+        exam_id, page_id, segs, pid = self._read_one()
+        self.assertEqual(self.c.delete(f"/problems/{pid}?unpick=true").status_code, 204)
+        r = self.c.post(f"/trash/problem/{pid}/restore")
+        self.assertEqual(r.status_code, 200, r.text)
+        items = self.c.get(f"/exams/{exam_id}/problems").json()["items"]
+        self.assertEqual([i["problem_id"] for i in items], [pid])                       # 복구하면 목록에 다시 나온다
+
     def test_neighbors(self):
         exam_id, page_id, segs = self._setup(3)
         self._read(exam_id)

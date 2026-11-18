@@ -73,8 +73,10 @@ def reread(pid: str, response: Response, owner: str = Depends(current_user),
 
 
 @router.delete("/problems/{pid}", status_code=204, response_class=Response)
-def delete_problem(pid: str, owner: str = Depends(current_user), session: Session = Depends(get_session)):
-    svc.delete_problem(session, owner, pid)
+def delete_problem(pid: str, unpick: bool = False, owner: str = Depends(current_user),
+                   session: Session = Depends(get_session)):
+    """unpick=true면 칸의 '고름'도 함께 푼다(읽기 실패한 문제를 목록에서 빼는 용도)."""
+    svc.delete_problem(session, owner, pid, unpick)
     return Response(status_code=204)
 
 

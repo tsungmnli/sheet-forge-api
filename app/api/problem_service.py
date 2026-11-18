@@ -281,9 +281,15 @@ def reread(session, owner: str, pid: str, settings, now) -> dict:
     return problem_view(session, p)
 
 
-def delete_problem(session, owner: str, pid: str) -> None:
+def delete_problem(session, owner: str, pid: str, unpick: bool = False) -> None:
+    """문제를 휴지통으로 보낸다. unpick이면 그 칸의 '고름'도 풀어, 목록에서 빠지고 다음 '읽기'에도 다시 읽히지 않게 한다."""
     p = _load(session, owner, pid)
     soft_delete(session, Problem, pid, owner)
+    if unpick:
+        seg = session.get(Segment, p.segment_id)
+        if seg is not None and seg.deleted_at is None and seg.marked:
+            seg.marked = False
+            seg.updated_at = func.now()
     touch_exam(session, p.exam_id)
     session.commit()
 

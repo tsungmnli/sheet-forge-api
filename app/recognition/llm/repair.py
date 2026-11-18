@@ -73,8 +73,18 @@ _BOX = re.compile(r"\\text\{\\(?:fbox|boxed)\{([^{}]*)\}\}|\\(?:fbox|boxed)\{([^
 
 _TEXTCMD = re.compile(r"\\(?:text|mathrm|mbox)\{([^{}]*)\}")
 
+_NESTED_TEXT = re.compile(r"\\(text|mathrm|mbox)\{([^{}]*)\\(?:text|mathrm|mbox)\{([^{}]*)\}([^{}]*)\}")
+
+
+def _flatten_text(latex):
+    prev = None
+    while prev != latex:
+        prev, latex = latex, _NESTED_TEXT.sub(lambda m: "\\" + m.group(1) + "{" + m.group(2) + m.group(3) + m.group(4) + "}", latex)
+    return latex
+
 
 def _split_hangul(latex):
+    latex = _flatten_text(latex)
     if _BOX.search(latex) or "\\begin{" in latex:
         # cases 같은 환경이 쪼개지지 않도록 통째로 한 math로 둔다(수식 안 한글은 변환기가 작게 표시, 경고만)
         return [_m(_BOX.sub(lambda m: "\\text{" + (m.group(1) or m.group(2)) + "}", latex))]

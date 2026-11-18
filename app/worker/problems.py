@@ -177,7 +177,7 @@ FAIL_BY_LLM_KIND = {
     "network": "읽기 서비스에 연결하지 못했어요. 잠시 뒤 다시 읽어 보세요.",
     "rate_limit": "지금 읽기 요청이 몰려 있어요. 잠시 뒤 다시 읽어 보세요.",
     "server": "읽기 서비스가 잠시 불안정해요. 잠시 뒤 다시 읽어 보세요.",
-    "blocked": "이 사진은 안전 기준 때문에 읽을 수 없었어요. 영역을 다시 고르거나 직접 입력해 주세요.",
+    "blocked": "이 부분은 AI가 읽기를 거부했어요. 영역을 좁게 다시 고르면 읽힐 수 있어요. 안 되면 직접 입력해 주세요.",
     "empty": "글자와 수식을 찾지 못했어요. 영역을 다시 고른 뒤 읽어 보세요.",
     "bad_response": "읽은 결과를 받지 못했어요. 다시 읽어 보세요.",
     "auth": "읽기 서비스 설정에 문제가 있어요. 관리자에게 알려 주세요.",
@@ -188,7 +188,10 @@ FAIL_BY_LLM_KIND = {
 def read_fail_info(exc: BaseException | None) -> dict:
     """읽기 실패 원인을 선생님께 보여 줄 쉬운 문장으로 바꾼다. code는 종류만(내용·키 없음)."""
     if isinstance(exc, LlmError):
-        return {"code": f"llm_{exc.kind}", "message": FAIL_BY_LLM_KIND.get(exc.kind, FAIL_GENERIC)}
+        info = {"code": f"llm_{exc.kind}", "message": FAIL_BY_LLM_KIND.get(exc.kind, FAIL_GENERIC)}
+        if exc.detail:
+            info["detail"] = exc.detail   # 차단 종류 이름만(SAFETY·RECITATION 등). 내용 없음
+        return info
     if isinstance(exc, ReadEmptyError):
         return {"code": "empty", "message": "글자와 수식을 찾지 못했어요. 영역을 다시 고른 뒤 읽어 보세요."}
     if isinstance(exc, ReadParseError):

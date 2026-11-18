@@ -18,7 +18,7 @@ def build_processor(settings, client=None):
         if not settings.llm_api_key:
             raise SystemExit("SHEET_FORGE_RECOGNITION_ENGINE=real이면 SHEET_FORGE_LLM_API_KEY가 필요해요.")
         from .llm.client import GeminiClient
-        client = GeminiClient(settings.llm_api_key)
+        client = GeminiClient(settings.llm_api_key, safety_threshold=settings.llm_safety_threshold)
     from .processor import RealPageProcessor
     limits = LlmLimits(timeout_s=float(settings.llm_timeout_s), max_output_tokens=8192)
     return RealPageProcessor(client, settings.segment_model, long_side=settings.segment_image_long_side, limits=limits)
@@ -47,7 +47,7 @@ def build_recognizer(settings, client=None):
         if not settings.llm_api_key:
             raise SystemExit("SHEET_FORGE_RECOGNITION_ENGINE=real이면 SHEET_FORGE_LLM_API_KEY가 필요해요.")
         from .llm.client import GeminiClient
-        client = GeminiClient(settings.llm_api_key)
+        client = GeminiClient(settings.llm_api_key, safety_threshold=settings.llm_safety_threshold)
     from .llm.recognizer import RealRecognizer
 
     def limits(model, timeout_s):
