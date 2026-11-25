@@ -86,6 +86,6 @@ def test_to_content_maps_paragraph_box_and_table():
     assert obj == before
 
 
-def test_to_content_fills_missing_box_title():
+def test_to_content_keeps_missing_box_title_empty():
     obj = {"stem": [{"type": "box", "title": None, "paragraphs": [{"inlines": [_t("ㄱ")]}]}], "choices": None}
-    assert to_content(obj)["stem"][0]["title"] == "<보기>"
+    assert to_content(obj)["stem"][0]["title"] == ""   # 제목 없는 상자는 <보기>로 바꾸지 않는다
