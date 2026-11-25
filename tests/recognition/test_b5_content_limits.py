@@ -21,13 +21,15 @@ def _stem(*blocks):
 
 
 def test_limits_match_api():
-    assert (c.BOX_TITLE_DEFAULT, c.MAX_TITLE, c.MAX_BOX_LINES, c.MAX_TABLE_ROWS, c.MAX_TABLE_COLS) == (
-        sb.BOX_TITLE_DEFAULT, sb.MAX_TITLE, sb.MAX_BOX_LINES, sb.MAX_TABLE_ROWS, sb.MAX_TABLE_COLS)
+    assert (c.MAX_TITLE, c.MAX_BOX_LINES, c.MAX_TABLE_ROWS, c.MAX_TABLE_COLS) == (
+        sb.MAX_TITLE, sb.MAX_BOX_LINES, sb.MAX_TABLE_ROWS, sb.MAX_TABLE_COLS)
 
 
-def test_box_title_default_and_truncate():
-    assert to_content(_stem(_box(1, None)))["stem"][0]["title"] == "<보기>"
-    assert to_content(_stem(_box(1, "  ")))["stem"][0]["title"] == "<보기>"
+def test_box_without_title_stays_titleless_and_truncate():
+    # 제목이 인쇄되지 않은 조건 상자는 <보기>로 바꾸지 않고 제목 없는 상자("")로 둔다
+    assert to_content(_stem(_box(1, None)))["stem"][0]["title"] == ""
+    assert to_content(_stem(_box(1, "  ")))["stem"][0]["title"] == ""
+    assert to_content(_stem(_box(1, "<보기>")))["stem"][0]["title"] == "<보기>"
     assert to_content(_stem(_box(1, "가" * 25)))["stem"][0]["title"] == "가" * 20
 
 

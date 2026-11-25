@@ -2,13 +2,12 @@
 
 저장 모양:
   {"type":"paragraph", "inlines":[...]}
-  {"type":"box",   "title":"<보기>", "paragraphs":[{"inlines":[...]}, ...]}
+  {"type":"box",   "title":"<보기>" | "", "paragraphs":[{"inlines":[...]}, ...]}   # title이 ""이면 제목 없는 상자(조건 상자)
   {"type":"table", "rows":[[[inline, ...], ...], ...]}        # 셀 = 조각 목록(선택지 한 개와 같은 모양), 모든 행의 칸 수가 같다
 조각 위치(path)는 웹이 그 자리로 이동하는 데 쓴다:
   stem/{b}/inlines/{i}  ·  stem/{b}/paragraphs/{p}/inlines/{i}  ·  stem/{b}/rows/{r}/{c}/{i}
 """
 
-BOX_TITLE_DEFAULT = "<보기>"
 MAX_BOX_LINES = 30
 MAX_TITLE = 20
 MAX_TABLE_ROWS = 40
@@ -68,10 +67,12 @@ def normalize_block(block: dict, bad) -> dict:
     t = block.get("type") or "paragraph"
     if t == "box":
         title = block.get("title")
-        if title is None or title == "":
-            title = BOX_TITLE_DEFAULT
+        if title is None:
+            title = ""      # 제목 없는 상자. <보기>를 대신 붙이지 않는다
         if not isinstance(title, str) or len(title) > MAX_TITLE:
             raise bad("상자 제목이 올바르지 않아요.")
+        if not title.strip():
+            title = ""
         paras = block.get("paragraphs") or []
         if not isinstance(paras, list) or len(paras) > MAX_BOX_LINES:
             raise bad("상자의 줄이 너무 많아요.")

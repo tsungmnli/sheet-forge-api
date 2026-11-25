@@ -115,6 +115,37 @@ def box_xml(base_id: int, z_order: int, geom, body_paras: str, title_para: str) 
             '</hp:container>')
 
 
+def plain_box_xml(base_id: int, z_order: int, geom, body_paras: str) -> str:
+    """제목 없는 상자: 묶음 개체 없이 hp:rect 하나(샘플 시험지.hwpx의 조건 상자와 같은 모양).
+    orgSz는 8504 정사각형, 크기는 curSz와 scaMatrix 배율(w/8504, h/8504). 위치는 샘플의 쪽 기준이 아니라
+    문단 기준·글자처럼 취급(PARA)이라 문항 순서가 바뀌어도 따라간다(vertOffset 932는 제목 자리였으므로 0) [제안: 한글 확인 필요]."""
+    w, h = geom.width, geom.height
+    ident = 'e1="1" e2="0" e3="0" e4="0" e5="1" e6="0"'
+    return (f'<hp:rect id="{base_id}" zOrder="{z_order}" numberingType="PICTURE" textWrap="IN_FRONT_OF_TEXT" '
+            f'textFlow="BOTH_SIDES" lock="0" dropcapstyle="None" href="" groupLevel="0" instid="{base_id}" ratio="0">'
+            f'<hp:offset x="0" y="0"/><hp:orgSz width="{BOX_UNIT}" height="{BOX_UNIT}"/><hp:curSz width="{w}" height="{h}"/>'
+            '<hp:flip horizontal="0" vertical="0"/>'
+            f'<hp:rotationInfo angle="0" centerX="{w // 2}" centerY="{h // 2}" rotateimage="1"/>'
+            f'<hp:renderingInfo><hc:transMatrix {ident}/>'
+            f'<hc:scaMatrix e1="{_f(w / BOX_UNIT)}" e2="0" e3="0" e4="0" e5="{_f(h / BOX_UNIT)}" e6="0"/>'
+            f'<hc:rotMatrix {ident}/></hp:renderingInfo>'
+            '<hp:lineShape color="#000000" width="33" style="SOLID" endCap="FLAT" headStyle="NORMAL" tailStyle="NORMAL" '
+            'headfill="1" tailfill="1" headSz="MEDIUM_MEDIUM" tailSz="MEDIUM_MEDIUM" outlineStyle="NORMAL" alpha="0"/>'
+            '<hc:fillBrush><hc:winBrush faceColor="#FFFFFF" hatchColor="#000000" alpha="0"/></hc:fillBrush>'
+            '<hp:shadow type="NONE" color="#B2B2B2" offsetX="0" offsetY="0" alpha="0"/>'
+            f'<hp:drawText lastWidth="{w}" name="" editable="0">'
+            '<hp:subList id="" textDirection="HORIZONTAL" lineWrap="BREAK" vertAlign="CENTER" linkListIDRef="0" '
+            'linkListNextIDRef="0" textWidth="0" textHeight="0" hasTextRef="0" hasNumRef="0">'
+            f'{body_paras}</hp:subList><hp:textMargin left="283" right="283" top="283" bottom="283"/></hp:drawText>'
+            f'<hc:pt0 x="0" y="0"/><hc:pt1 x="{BOX_UNIT}" y="0"/><hc:pt2 x="{BOX_UNIT}" y="{BOX_UNIT}"/>'
+            f'<hc:pt3 x="0" y="{BOX_UNIT}"/>'
+            f'<hp:sz width="{w}" widthRelTo="ABSOLUTE" height="{h}" heightRelTo="ABSOLUTE" protect="0"/>'
+            '<hp:pos treatAsChar="1" affectLSpacing="0" flowWithText="0" allowOverlap="1" holdAnchorAndSO="0" '
+            'vertRelTo="PARA" horzRelTo="PARA" vertAlign="TOP" horzAlign="LEFT" vertOffset="0" horzOffset="0"/>'
+            '<hp:outMargin left="0" right="0" top="0" bottom="0"/><hp:shapeComment>사각형입니다.</hp:shapeComment>'
+            '</hp:rect>')
+
+
 def table_xml(tbl_id: int, z_order: int, t: TablePart, cells: list) -> str:
     """표. 샘플(시험지.hwpx)의 hp:tbl 모양을 따르되 위치는 글자처럼 취급(PARA)·쪽 나눔 없음이다 [제안: 한글 확인 필요].
     cells[r][c]는 칸 안 문단 XML. 칸 크기는 최소값이고 한글이 내용에 맞춰 행 높이를 늘린다."""
@@ -173,6 +204,8 @@ class _Ctx:
             return paragraph_xml(BOX_PARA_BASE + self.n_ipara, pr, parts, self)
 
         body = "".join(para(b.body_pr, parts) for parts in b.lines)
+        if not b.title:   # 제목 없는 상자: 글상자 하나. id는 묶음 개체와 같은 번호 칸(3개씩)을 쓴다
+            return plain_box_xml(BOX_ID_BASE + 3 * n, BOX_Z_BASE + n, b.geom, body)
         return box_xml(BOX_ID_BASE + 3 * n, BOX_Z_BASE + n, b.geom, body, para(b.title_pr, [b.title]))
 
     def picture(self, p: Picture) -> str:

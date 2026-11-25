@@ -71,11 +71,15 @@ class Normalize(unittest.TestCase):
     def norm(self, c):
         return pl.normalize_content(ContentIn.model_validate(c))
 
-    def test_box_default_title_and_inlines_dropped(self):
+    def test_box_without_title_is_titleless_and_inlines_dropped(self):
         out = self.norm(content({"type": "box", "paragraphs": [{"inlines": [t("ㄱ")]}]}))
         b = out["stem"][0]
-        self.assertEqual((b["type"], b["title"]), ("box", "<보기>"))
+        self.assertEqual((b["type"], b["title"]), ("box", ""))
         self.assertNotIn("inlines", b)
+
+    def test_box_title_kept_or_blanked(self):
+        self.assertEqual(self.norm(content(box([t("ㄱ")])))["stem"][0]["title"], "<보기>")
+        self.assertEqual(self.norm(content(box([t("ㄱ")], title="  ")))["stem"][0]["title"], "")
 
     def test_table_padded_rectangular(self):
         out = self.norm(content(table([[t("a")], [t("b")], [t("c")]], [[t("d")]])))

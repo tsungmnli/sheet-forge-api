@@ -115,6 +115,16 @@ def validate_package(data: bytes) -> list:
         sz = e.find(f"{{{HP}}}sz")
         if sz is None or int(sz.get("width", 0)) <= 0 or int(sz.get("height", 0)) <= 0:
             problems.append(f"묶음 개체 {e.get('id')}: sz가 올바르지 않음")
+    # 제목 없는 상자: 묶음 개체 안의 글상자(groupLevel=1)가 아닌 단독 글상자(groupLevel=0)
+    for e in sec.iter(f"{{{HP}}}rect"):
+        if e.get("groupLevel") != "0":
+            continue
+        if e.get("id") in box_ids or e.get("id") in eq_ids or e.get("id") in pic_ids or e.get("id") in seen:
+            problems.append(f"글상자 id 중복 {e.get('id')}")
+        box_ids.add(e.get("id"))
+        sz = e.find(f"{{{HP}}}sz")
+        if sz is None or int(sz.get("width", 0)) <= 0 or int(sz.get("height", 0)) <= 0:
+            problems.append(f"글상자 {e.get('id')}: sz가 올바르지 않음")
     # 표: id 고유, 행·열 수 일치, 행마다 칸 폭 합 = 표 폭, 칸 모양(borderFill) 존재, borderFills itemCnt
     border_ids = set(ids_of("borderFill"))
     for bf in head.iter(f"{{{HH}}}borderFills"):

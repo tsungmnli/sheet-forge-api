@@ -37,8 +37,9 @@ class Picture:
 
 @dataclass
 class BoxPart:
-    """<보기> 상자(묶음 개체: 본문 글상자 + 윗선에 걸친 제목 글상자). lines는 줄마다 str | Equation 목록.
-    body_pr·title_pr는 내보낼 때 StyleRegistry가 정한 문단 모양 id."""
+    """상자. title이 있으면 <보기> 상자(묶음 개체: 본문 글상자 + 윗선에 걸친 제목 글상자),
+    title이 ""이면 제목 없는 상자(글상자 하나 — 샘플 시험지.hwpx의 조건 상자). lines는 줄마다 str | Equation 목록.
+    body_pr·title_pr는 내보낼 때 StyleRegistry가 정한 문단 모양 id(제목 없는 상자는 title_pr를 쓰지 않는다)."""
     title: str
     lines: list
     geom: object
@@ -261,9 +262,10 @@ def build_problem_paragraphs(problem: dict, number_text: str, report: ExportRepo
     return specs
 
 
-# ---------------------------------------------------------------- <보기> 상자 [샘플 시험지.hwpx 기준]
+# ---------------------------------------------------------------- 상자 [샘플 시험지.hwpx 기준]
 def _box_spec(block: dict, bi: int, pid, report: ExportReport, layout):
-    """box 블록({"type":"box","title":"<보기>","paragraphs":[{"inlines":[...]} | [...], ...]}) → 상자 문단.
+    """box 블록({"type":"box","title":"<보기>" | "","paragraphs":[{"inlines":[...]} | [...], ...]}) → 상자 문단.
+    title이 비어 있거나 없으면 제목 없는 상자(글상자 하나)로, 있으면 <보기> 상자(묶음 개체)로 만든다.
     상자 폭은 들어갈 단의 폭을 따르고(1·2·3단), 제목은 윗선 위 가로·세로 가운데에 놓는다.
     높이는 줄 수에서 추정한다(한글이 다시 계산하지 않는다)."""
     path = f"stem[{bi}]"
@@ -283,7 +285,7 @@ def _box_spec(block: dict, bi: int, pid, report: ExportReport, layout):
     if not lines:
         report.add("BOX_EMPTY", "warn", "내용이 없는 상자를 제외함", pid, path)
         return None
-    title = clean_text(str(block.get("title") or "<보기>"))
+    title = clean_text(str(block.get("title") or "")).strip()   # 없으면 제목 없는 상자 (<보기>를 대신 붙이지 않는다)
     geom = bg.plan_box(col_w, title, plan, font, pct)
     report.add("BOX_HEIGHT_ESTIMATED", "info",
                f"상자 높이({geom.height})는 줄 수로 추정한 값 — 한글에서 글이 넘치거나 남으면 상자 크기를 조절하세요", pid, path)
