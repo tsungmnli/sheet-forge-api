@@ -21,6 +21,9 @@ MAX_FIGURES = 20
 MSG_UNSUPPORTED = "이 수식은 아직 한글 수식으로 바꿀 수 없어요."
 MSG_EMPTY_MATH = "수식이 비어 있어요."
 MSG_MATH_NOTE = "이 수식은 한글에서 한 번 확인해 보면 좋아요."
+MSG_HWP_FIX = "한글에서 직접 고칠 수식으로 표시했어요. 내보낸 한글 파일에서 '수식 입력'을 찾아 고쳐 주세요."
+MSG_HWP_FIX_NOW_OK = "이 수식은 이제 한글 수식으로 바꿀 수 있어요. '한글에서 수정' 표시를 풀면 수식으로 내보내져요."
+MSG_HWP_FIX_TIP = "웹에서 고칠 수 없으면 '한글에서 수정'으로 표시하고 내보낸 뒤 한글에서 고칠 수 있어요."
 
 
 def empty_content() -> dict:
@@ -168,6 +171,16 @@ def search_text(content: dict, limit: int = 20000) -> str:
     return " ".join(" ".join(parts).split())[:limit]
 
 
+def unsupported_reason(r) -> str:
+    """변환이 안 되는 까닭을 선생님이 알아볼 말로. 어떤 기호 때문인지 알려 줘야 '한글에서 고치기'로 넘길지 정할 수 있다."""
+    if r.documented:
+        names = ", ".join(sorted({f"\\{n}" if n.isalpha() else n for n, _ in r.documented}))
+        return f"{names} 기호는 한글에서 어떻게 보일지 아직 확인하지 못했어요."
+    if r.error and r.error.startswith("지원하지 않는 명령"):
+        return r.error.replace("지원하지 않는 명령 ", "") + " 명령은 아직 지원하지 않아요."
+    return r.error or ""
+
+
 def analyze(content: dict):
     """(hints, blockers, has_content). hints는 저장하지 않고 읽을 때마다 계산한다."""
     hints, blockers, has = [], [], False
@@ -182,10 +195,17 @@ def analyze(content: dict):
             has = has or bool(latex.strip())
             if not latex.strip():
                 blockers.append({"path": path, "code": "MATH_UNSUPPORTED", "message": MSG_EMPTY_MATH})
+            elif inl.get("hwp_fix"):
+                # 한글에서 직접 고치기로 표시한 수식: 변환하지 않으므로 확인 완료를 막지 않고, 내보낼 때 글자로 들어간다
+                # 표시는 그대로 존중한다. 다만 지금은 변환할 수 있으면 풀어도 된다고 알려 준다.
+                msg = MSG_HWP_FIX_NOW_OK if convert(latex).ok else MSG_HWP_FIX
+                hints.append({"path": path, "kind": "hwp_fix", "message": msg})
             else:
                 r = convert(latex)
                 if not r.ok:
-                    blockers.append({"path": path, "code": "MATH_UNSUPPORTED", "message": MSG_UNSUPPORTED})
+                    why = unsupported_reason(r)
+                    blockers.append({"path": path, "code": "MATH_UNSUPPORTED",
+                                     "message": " ".join(x for x in (MSG_UNSUPPORTED, why, MSG_HWP_FIX_TIP) if x)})
                 elif r.warnings:
                     hints.append({"path": path, "kind": "math_warning", "message": MSG_MATH_NOTE})
         conf = inl.get("conf")
@@ -202,7 +222,8 @@ def check_math(latex: str) -> dict:
         return {"status": "unsupported", "message": MSG_EMPTY_MATH, "est_width": None}
     r = convert(latex)
     if not r.ok:
-        return {"status": "unsupported", "message": MSG_UNSUPPORTED, "est_width": None}
+        return {"status": "unsupported", "message": " ".join(x for x in (MSG_UNSUPPORTED, unsupported_reason(r)) if x),
+                "est_width": None}
     width = round(float(r.est_width_em), 2)
     if r.warnings:
         return {"status": "warn", "message": MSG_MATH_NOTE, "est_width": width}

@@ -118,7 +118,7 @@ def emit_node(n):
         rows = [" ~~ ".join(emit_seq(c) for c in r) for r in n.rows]
         return "cases{" + " # ".join(rows) + "}"
     if isinstance(n, Deco):
-        return n.kind + " {" + emit_seq(n.body) + "}"          # bar | dot
+        return n.kind + " {" + emit_seq(n.body) + "}"          # bar | arch | vec | dyad | dot
     raise MathError(f"방출할 수 없는 노드 {type(n).__name__}")
 
 

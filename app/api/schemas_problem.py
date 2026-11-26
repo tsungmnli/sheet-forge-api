@@ -117,7 +117,7 @@ class OcrOut(BaseModel):
 
 class HintOut(BaseModel):
     path: str
-    kind: Literal["low_confidence", "math_warning"]
+    kind: Literal["low_confidence", "math_warning", "hwp_fix"]
     message: str | None = None
 
 

@@ -22,8 +22,10 @@ SYMBOLS = {
     "in": ("IN", VERIFIED), "notin": ("notin", VERIFIED), "subset": ("SUBSET", VERIFIED),
     "cup": ("cup", VERIFIED), "cap": ("cap", VERIFIED), "emptyset": ("EMPTYSET", VERIFIED),
     "{": ("lbrace", VERIFIED), "}": ("rbrace", VERIFIED),
-    # 기하
+    # 기하. 평행·수직은 sample.hwpx(`bar{rm AB} ⫽ bar{rm CD}`, `bar {rm AB} BOT bar {rm CD}`)로 확인했다.
+    # 평행은 VERT(‖)가 아니라 유니코드 ⫽(U+2AFD)다.
     "angle": ("angle", VERIFIED), "triangle": ("triangle", VERIFIED),
+    "perp": ("BOT", VERIFIED), "parallel": ("⫽", VERIFIED),
     # 큰 연산자 (아래·위 첨자와 함께 쓰임)
     "sum": ("sum", VERIFIED), "int": ("int", VERIFIED),
     # 그리스 소문자
@@ -32,7 +34,7 @@ SYMBOLS = {
     "exists": ("EXIST", DOCUMENTED), "supset": ("SUPSET", DOCUMENTED), "subseteq": ("SUBSETEQ", DOCUMENTED),
     "supseteq": ("SUPSETEQ", DOCUMENTED), "wedge": ("WEDGE", DOCUMENTED), "vee": ("VEE", DOCUMENTED),
     "equiv": ("EQUIV", DOCUMENTED), "sim": ("SIM", DOCUMENTED), "cong": ("CONG", DOCUMENTED),
-    "approx": ("APPROX", DOCUMENTED), "perp": ("BOT", DOCUMENTED), "parallel": ("VERT", DOCUMENTED),
+    "approx": ("APPROX", DOCUMENTED),
     "because": ("BECAUSE", DOCUMENTED), "cdots": ("cdots", DOCUMENTED), "ldots": ("LDOTS", DOCUMENTED),
     "prod": ("PROD", DOCUMENTED),
 }
@@ -66,7 +68,7 @@ UNICODE_CMD = {
     "≤": "le", "≥": "ge", "≠": "ne", "±": "pm", "×": "times", "÷": "div", "·": "cdot", "∞": "infty",
     "∴": "therefore", "∈": "in", "∉": "notin", "⊂": "subset", "∪": "cup", "∩": "cap", "∅": "emptyset",
     "→": "to", "⇒": "Rightarrow", "⇔": "Leftrightarrow", "∠": "angle", "△": "triangle", "∘": "circ",
-    "∀": "forall", "θ": "theta", "π": "pi", "α": "alpha", "β": "beta",
+    "∀": "forall", "∥": "parallel", "⫽": "parallel", "⊥": "perp", "θ": "theta", "π": "pi", "α": "alpha", "β": "beta",
 }
 
 # 명령 별칭(정규화)
@@ -75,6 +77,13 @@ ALIASES = {
     "rightarrow": "to", "implies": "Rightarrow", "iff": "Leftrightarrow", "lbrace": "{", "rbrace": "}",
     "varnothing": "emptyset", "dots": "ldots", "textrm": "mathrm", "text": "text", "mathbb": "mathbb",
     "lvert": "|", "rvert": "|", "overline": "overline", "bar": "overline", "displaystyle": "displaystyle",
+    "overgroup": "overparen", "wideparen": "overparen",   # 호(arc)를 나타내는 같은 뜻의 표기
 }
+
+# 글자 위에 얹는 장식: LaTeX 명령 → 한글 수식 명령. sample.hwpx에서 확인한 표기만 둔다.
+#   arch{rm AB} 호 · bar{rm AB} 선분 · vec{rm AB} 반직선 · dyad{rm AB} 직선 · dot{…} 순환소수
+# \widehat은 각 위에 모자를 씌우는 데에도 쓰여 뜻이 갈리므로, 한글에서 어떻게 보이는지 확인하기 전에는 넣지 않는다.
+DECO_CMDS = {"overline": "bar", "overparen": "arch", "overrightarrow": "vec", "vec": "vec",
+             "overleftrightarrow": "dyad", "dot": "dot"}
 
 SPACE_CMDS = {",": "`", ";": "~", ":": "~", " ": "~", "quad": "~~", "qquad": "~~~~", "!": ""}

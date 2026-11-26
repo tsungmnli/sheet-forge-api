@@ -39,7 +39,10 @@ class WsItemOut(BaseModel):
     deleted: bool
     exam: WsExamRef
     preview: str
+    # 수식을 $…$로 감싼 미리보기. 화면은 이쪽을 우선 그린다(없으면 preview).
+    preview_tex: str = ""
     crop_url: str | None
+    source_number: str | None = None
 
 
 class WorksheetOut(BaseModel):

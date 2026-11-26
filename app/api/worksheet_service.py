@@ -14,7 +14,7 @@ from ..export.hwpx import ExportPreset, PresetError, plan_layout
 from .errors import ApiError
 from .pagination import decode_cursor, encode_cursor
 from .preset_service import get_preset_value
-from .problem_logic import preview
+from .problem_logic import preview, preview_tex
 from .repo import alive, soft_delete, update_versioned
 from .serialize import image_url, iso
 
@@ -85,17 +85,19 @@ def _exam_confirmed_ids(session, owner: str, exam_id: str) -> list:
 # ---------- 조회 ----------
 def worksheet_view(session, ws: Worksheet) -> dict:
     rows = session.execute(
-        select(Problem, Exam.id, Exam.title)
+        select(Problem, Exam.id, Exam.title, Segment.number)
         .join(WorksheetItem, WorksheetItem.problem_id == Problem.id)
         .join(Exam, Exam.id == Problem.exam_id)
+        .outerjoin(Segment, Segment.id == Problem.segment_id)
         .where(WorksheetItem.worksheet_id == ws.id)
         .order_by(WorksheetItem.position)).all()
-    numbers = assign_numbers([(p.deleted_at is not None, p.status) for p, _, _ in rows],
+    numbers = assign_numbers([(p.deleted_at is not None, p.status) for p, _, _, _ in rows],
                              ws.preset, ws.unconfirmed_policy)
     items = [{"problem_id": p.id, "number": num, "status": p.status, "deleted": p.deleted_at is not None,
               "exam": {"id": eid, "title": etitle or ""}, "preview": preview(p.content or {}),
-              "crop_url": image_url(p.crop_ref)}
-             for (p, eid, etitle), num in zip(rows, numbers)]
+              "preview_tex": preview_tex(p.content or {}),
+              "crop_url": image_url(p.crop_ref), "source_number": snum}
+             for (p, eid, etitle, snum), num in zip(rows, numbers)]
     try:
         layout = plan_layout(ExportPreset.from_dict(ws.preset)).summary()
     except PresetError:

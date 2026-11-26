@@ -152,7 +152,7 @@ class Cases:
 
 @dataclass
 class Deco:
-    kind: str               # bar
+    kind: str               # bar | arch | vec | dyad | dot
     body: list
 
 
@@ -310,10 +310,8 @@ class Parser:
             return Sqrt(self.parse_arg(), index)
         if name in ("mathrm", "mathbb", "text"):
             return self.text_like(name, tok)
-        if name == "overline":
-            return Deco("bar", self.parse_arg())
-        if name == "dot":
-            return Deco("dot", self.parse_arg())   # 순환소수: 한글 `dot {…}`
+        if name in vocab.DECO_CMDS:
+            return Deco(vocab.DECO_CMDS[name], self.parse_arg())   # bar·arch·vec·dyad·dot(순환소수)
         if name == "left":
             return self.left_right(pos)
         if name == "right":

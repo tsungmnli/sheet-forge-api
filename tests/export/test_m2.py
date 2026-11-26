@@ -68,10 +68,19 @@ class EquationEmission(unittest.TestCase):
         self.assertEqual(r.report.stats["equations"], 2)
         self.assertEqual(validate_package(r.hwpx_bytes), [])
 
-    def test_base_unit_follows_font_size(self):
-        r10 = run([prob([M("x")])])
+    def test_base_unit_follows_equation_size(self):
+        # 기본: 글자 11.5pt, 수식 11pt → baseUnit은 수식 크기를 따른다
+        rd = run([prob([M("x")])])
+        self.assertEqual(equations(rd)[0].get("baseUnit"), "1100")
+        # 수식 크기를 따로 정하면 글자 크기와 달라도 그 값을 쓴다
+        rx = run([prob([M("x")])], {"typography": {"font_size_pt": 12, "equation_size_pt": 13}})
+        self.assertEqual(equations(rx)[0].get("baseUnit"), "1300")
+
+    def test_base_unit_follows_font_size_when_equation_size_missing(self):
+        # 수식 크기가 없는 옛 모양은 글자 크기를 따라간다 [검증 t17a]
+        r10 = run([prob([M("x")])], {"typography": {"font_size_pt": 10}})
         r12 = run([prob([M("x")])], {"typography": {"font_size_pt": 12}})
-        self.assertEqual(equations(r10)[0].get("baseUnit"), "1000")        # [검증 t17a]
+        self.assertEqual(equations(r10)[0].get("baseUnit"), "1000")
         self.assertEqual(equations(r12)[0].get("baseUnit"), "1200")
 
     def test_script_is_xml_escaped(self):

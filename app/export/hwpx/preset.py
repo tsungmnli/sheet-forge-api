@@ -36,7 +36,8 @@ class Columns:
 @dataclass
 class Typography:
     font_name: str = "함초롬바탕"
-    font_size_pt: float = 10.0
+    font_size_pt: float = 11.5   # 일반 글자
+    equation_size_pt: float = 11.0   # 수식(baseUnit)
     line_spacing_pct: int = 160
     align: str = "auto"  # auto | left | justify
 
@@ -114,6 +115,9 @@ def _build(cls, d, path, errors):
             kwargs[k] = _build(ftype, v, f"{path}{k}.", errors)
         else:
             kwargs[k] = v
+    # 수식 크기가 없던 옛 모양은 그때처럼 글자 크기를 따라간다(기본값이 바뀌어도 이미 만든 문제지는 그대로)
+    if cls is Typography and "font_size_pt" in kwargs and "equation_size_pt" not in kwargs:
+        kwargs["equation_size_pt"] = kwargs["font_size_pt"]
     return cls(**kwargs)
 
 
@@ -181,6 +185,8 @@ def validate_preset(p: ExportPreset) -> list:
         err("PRESET_FONT", "글꼴 이름이 비어 있거나 잘못됨")
     if not (_num(t.font_size_pt) and 6 <= t.font_size_pt <= 20):  # [제안]
         err("PRESET_FONT_SIZE", "글자 크기는 6~20pt")
+    if not (_num(t.equation_size_pt) and 6 <= t.equation_size_pt <= 20):  # [제안]
+        err("PRESET_EQUATION_SIZE", "수식 크기는 6~20pt")
     if not (isinstance(t.line_spacing_pct, int) and not isinstance(t.line_spacing_pct, bool)
             and 100 <= t.line_spacing_pct <= 250):  # [제안]
         err("PRESET_LINE_SPACING", "줄 간격은 100~250%의 정수")

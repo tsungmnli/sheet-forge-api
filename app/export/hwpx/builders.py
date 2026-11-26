@@ -95,12 +95,24 @@ def clean_text(s: str) -> str:
 
 def _max_eq_em(layout) -> float:
     """한 줄에 허용할 수식 폭(em). em = 수식 baseUnit = 본문 글자 크기(HWPUNIT) [검증 t17a]."""
-    return float("inf") if layout is None else EQ_WRAP_RATIO * layout.col_w / layout.font_hwp
+    return float("inf") if layout is None else EQ_WRAP_RATIO * layout.col_w / layout.eq_font_hwp
+
+
+def _eq_ratio(layout) -> float:
+    """수식 em을 글자 em으로 바꾸는 비율(수식 크기 ÷ 글자 크기). 줄 수·열 수 추정을 글자 기준으로 맞춘다."""
+    return 1.0 if layout is None else layout.eq_font_hwp / layout.font_hwp
 
 
 def _math_part(il: dict, pid, where: str, report: ExportReport, max_em: float):
     """math inline → Equation 또는 폴백 텍스트(str). 변환 실패는 예외가 아니라 보고로 알린다(설계 10장)."""
     latex = clean_text(str(il.get("latex", "")))
+    if il.get("hwp_fix"):
+        # 선생님이 '한글에서 직접 고치기'로 표시한 수식: 변환하지 않고 원본 LaTeX를 눈에 띄는 글자로 넣는다.
+        # 한글에서 '수식 입력'을 찾기(Ctrl+F)로 모두 찾아 고칠 수 있다.
+        now_ok = " (지금은 수식으로 바꿀 수 있어요. 웹에서 '한글에서 수정' 표시를 풀면 수식으로 나가요)" if convert(latex).ok else ""
+        report.add("HWP_FIX_FLAGGED", "warn",
+                   f"한글에서 직접 고치도록 표시한 수식이에요 — 원본 LaTeX를 글자로 넣음: {latex}{now_ok}", pid, where)
+        return f"[한글에서 수식 입력: {latex}]"
     res = convert(latex, max_width_em=max_em, breaks=il.get("breaks"))
     if not res.ok:
         pos = "" if res.error_pos is None else f" (위치 {res.error_pos})"
@@ -156,17 +168,19 @@ def _text_em(s: str) -> float:
     return sum(CH_SPACE if c == " " else CH_ASCII if c.isascii() else CH_HANGUL for c in s)
 
 
-def item_width(parts: list, font_hwp: int) -> float:
-    """선택지 하나의 추정 폭(HWPUNIT): 마커 + 공백 + 내용."""
+def item_width(parts: list, font_hwp: int, eq_hwp: int | None = None) -> float:
+    """선택지 하나의 추정 폭(HWPUNIT): 마커 + 공백 + 내용. 수식은 수식 크기(eq_hwp)로 센다."""
+    eq_hwp = font_hwp if eq_hwp is None else eq_hwp
     em = CH_MARKER + CH_SPACE
+    eq_em = 0.0
     extra = 0
     for p in parts:
         if isinstance(p, str):
             em += _text_em(p)
         elif isinstance(p, Equation):
-            em += p.width_em
+            eq_em += p.width_em
             extra += EQ_OUT_MARGIN
-    return em * font_hwp + extra
+    return em * font_hwp + eq_em * eq_hwp + extra
 
 
 def choose_cols(widths: list, col_w: float, safety: float) -> int:
@@ -185,7 +199,7 @@ def _choice_rows(items: list, pid, report: ExportReport, layout, safety: float) 
     font = layout.font_hwp if layout else 1000
     col_w = layout.col_w if layout else float("inf")
     parsed = [_paragraph_parts(it, pid, report, float("inf"), f"choices[{k}]") for k, it in enumerate(items)]
-    widths = [item_width(p, font) for p in parsed]
+    widths = [item_width(p, font, layout.eq_font_hwp if layout else None) for p in parsed]
     n = choose_cols(widths, col_w, safety)
     if len(items) > 5:
         report.add("NOT_IMPLEMENTED", "warn", "⑥ 이상 마커는 한글에서 확인하지 않았지만 유니코드 ⑥~로 방출함", pid, "choices")
@@ -273,12 +287,13 @@ def _box_spec(block: dict, bi: int, pid, report: ExportReport, layout):
     font = layout.font_hwp if layout else 1000
     pct = layout.line_spacing_pct if layout else 160
     text_w = bg.box_width(col_w) - 2 * bg.TEXT_MARGIN
-    max_em = EQ_WRAP_RATIO * text_w / font if layout else float("inf")
+    max_em = EQ_WRAP_RATIO * text_w / layout.eq_font_hwp if layout else float("inf")
+    ratio = _eq_ratio(layout)
     lines, plan = [], []
     for k, para in enumerate(block.get("paragraphs") or []):
         inl = para.get("inlines") if isinstance(para, dict) else para
         parts = _paragraph_parts(inl, pid, report, max_em, f"{path}.paragraphs[{k}]")
-        em = sum(bg.text_em(p) if isinstance(p, str) else p.width_em for p in parts)
+        em = sum(bg.text_em(p) if isinstance(p, str) else p.width_em * ratio for p in parts)
         n_eq = sum(1 for p in parts if isinstance(p, Equation))
         lines.append(parts)
         plan.append((bg.line_rows(em, n_eq, text_w, font), n_eq > 0))
@@ -305,6 +320,7 @@ def _table_spec(block: dict, bi: int, pid, report: ExportReport, layout):
     col_w = layout.col_w if layout else bg.DEFAULT_COL_W
     font = layout.font_hwp if layout else 1000
     pct = layout.line_spacing_pct if layout else 160
+    ratio = _eq_ratio(layout)
     raw = [r for r in (block.get("rows") or []) if r]
     ncols = max((len(r) for r in raw), default=0)
     if not raw or ncols == 0:
@@ -315,7 +331,7 @@ def _table_spec(block: dict, bi: int, pid, report: ExportReport, layout):
         row = [_paragraph_parts(_cell_inlines(c), pid, report, float("inf"), f"{path}.rows[{ri}][{ci}]")
                for ci, c in enumerate(r)]
         rows.append(row + [[] for _ in range(ncols - len(row))])
-    stats = [[(sum(bg.text_em(p) if isinstance(p, str) else p.width_em for p in cell),
+    stats = [[(sum(bg.text_em(p) if isinstance(p, str) else p.width_em * ratio for p in cell),
                sum(1 for p in cell if isinstance(p, Equation)),
                any(isinstance(p, Equation) for p in cell)) for cell in row] for row in rows]
     weights = [max(s[j][0] for s in stats) + 2 * bg.CELL_MARGIN_X / font for j in range(ncols)]

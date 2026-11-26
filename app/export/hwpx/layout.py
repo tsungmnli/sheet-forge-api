@@ -25,6 +25,11 @@ class LayoutContext:
     font_hwp: int          # 글자 크기 HWPUNIT = pt × 100 (= 수식 baseUnit)
     line_spacing_pct: int
     align: str             # JUSTIFY | LEFT
+    eq_hwp: int = 0        # 수식 크기 HWPUNIT = pt × 100 (= 수식 baseUnit). 0이면 글자 크기를 따른다
+
+    @property
+    def eq_font_hwp(self) -> int:
+        return self.eq_hwp or self.font_hwp
 
     @property
     def landscape_attr(self) -> str:
@@ -33,7 +38,8 @@ class LayoutContext:
     def summary(self) -> dict:
         mm = lambda v: round(v * 25.4 / 7200, 2)
         return {"body_w": self.body_w, "col_w": self.col_w, "body_w_mm": mm(self.body_w),
-                "col_w_mm": mm(self.col_w), "col_gap": self.col_gap, "font_hwp": self.font_hwp}
+                "col_w_mm": mm(self.col_w), "col_gap": self.col_gap, "font_hwp": self.font_hwp,
+                "eq_hwp": self.eq_font_hwp}
 
 
 def plan_layout(preset: ExportPreset) -> LayoutContext:
@@ -57,4 +63,5 @@ def plan_layout(preset: ExportPreset) -> LayoutContext:
         footer=mm_to_hwp(m.footer), left=left, right=right, gutter=gutter,
         col_count=n, col_gap=gap, page_horizontal=horizontal, body_w=body, col_w=col,
         font_hwp=round(preset.typography.font_size_pt * 100),
+        eq_hwp=round(preset.typography.equation_size_pt * 100),
         line_spacing_pct=preset.typography.line_spacing_pct, align=align)

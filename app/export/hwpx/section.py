@@ -276,7 +276,7 @@ def render_section(template_xml: str, layout: LayoutContext, paragraphs: list) -
         f'<hp:colPr id="" type="NEWSPAPER" layout="LEFT" colCount="{layout.col_count}" sameSz="1" '
         f'sameGap="{layout.col_gap}"/>', secpr_run)
 
-    ctx = _Ctx(layout.font_hwp)
+    ctx = _Ctx(layout.eq_font_hwp)
     first_pr, first_parts = paragraphs[0]
     first_tag = _need1(r'paraPrIDRef="\d+"', f'paraPrIDRef="{first_pr}"', first_tag)
     first_tag = _need1(r' id="\d+"', f' id="{PARA_ID_BASE}"', first_tag)
