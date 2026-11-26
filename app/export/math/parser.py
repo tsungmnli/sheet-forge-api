@@ -269,6 +269,8 @@ class Parser:
             return Sym("°", "°", pos=pos)
         if c in "+-=<>.!%":
             return Sym(c, c, pos=pos)
+        if c == ":":   # 비율·대응: 한글 수식에서도 그냥 ':' (sample_eq.hwpx의 `t:(1-t)`, `f:X` 로 확인)
+            return Sym(":", ":", pos=pos)
         if c == ",":
             return Sym(",", ",", "comma", pos)
         if c in "([":
@@ -279,7 +281,7 @@ class Parser:
             return Sym("|", "|", "bar", pos)
         if c == "'":
             return self.documented("prime", pos, "prime")
-        self.ctx.documented.append((c, pos))  # : ; / * — 렌더링 미확인
+        self.ctx.documented.append((c, pos))  # ; / * — 렌더링 미확인
         return Sym(c, c, pos=pos)
 
     def documented(self, script, pos, name):

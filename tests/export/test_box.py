@@ -106,6 +106,14 @@ class PlainBox(unittest.TestCase):
 
 
 class SampleGeometry(unittest.TestCase):
+    def test_title_slack_scales_with_font_size(self):
+        # 글자를 키워도 제목 글상자 안쪽 여유(글자 크기 대비)가 줄지 않아야 '< 보 기'/'>'로 갈라지지 않는다
+        t = bg.display_title("<보기>")
+        for font in (1000, 1150, 1300, 1600):
+            w, _ = bg.title_size(t, font)
+            inner = w - 2 * bg.TEXT_MARGIN
+            self.assertGreaterEqual(inner / font, bg.text_em(t) + 0.25, font)
+
     def test_reproduces_sample_numbers(self):
         # 샘플: 2단 한 단 폭 25795, 글자 1000, 줄 간격 160%, 수식 든 줄 4개
         g = bg.plan_box(25795, "<보기>", [(1, True)] * 4, 1000, 160)

@@ -15,7 +15,8 @@ from dataclasses import dataclass
 BOX_WIDTH_TRIM = 210        # 상자 폭 = 단 폭 - 이 값 (샘플 25795 → 25585)
 DEFAULT_COL_W = 25795       # layout이 없을 때(테스트) 쓰는 단 폭
 TEXT_MARGIN = 283           # drawText textMargin (샘플)
-TITLE_TEXT_PAD = 258        # 제목 글자 폭에 더하는 여유 (샘플에서 5124가 되게 맞춘 값)
+TITLE_PAD_EM = 0.258        # 제목 글자 폭에 더하는 여유(글자 크기 비율). 샘플 글자 1000에서 258 → 5124가 되게 맞춘 값.
+                            # 고정 숫자(258)로 두면 글자를 키울수록 여유가 줄어 '< 보 기'/'>'로 갈라지므로 글자 크기에 비례시킨다
 TITLE_H_PAD = 299           # 제목 높이 = 글자 + 안쪽 여백 2 x 283 + 이 값 (샘플 1865)
 TITLE_GAP = 100             # 제목 아래쪽과 첫 글줄 사이 최소 간격
 V_PAD_MIN = 300             # 제목이 작아도 확보하는 위아래 여유
@@ -52,7 +53,7 @@ def box_width(col_w: float) -> int:
 
 
 def title_size(title: str, font: int) -> tuple:
-    w = round(text_em(title) * font) + 2 * TEXT_MARGIN + TITLE_TEXT_PAD
+    w = round(text_em(title) * font) + 2 * TEXT_MARGIN + round(TITLE_PAD_EM * font)
     h = font + 2 * TEXT_MARGIN + TITLE_H_PAD
     return w, h
 

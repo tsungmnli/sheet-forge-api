@@ -59,6 +59,13 @@ def test_tokens_are_not_glued():
     assert "- >" in convert("a->b").script
 
 
+@pytest.mark.parametrize("latex", [r"t:(1-t)", r"f:X \to X", "3:2", r"\mathrm{A}:\mathrm{B}"])
+def test_colon_ratio_is_supported(latex):
+    # 비율·대응의 ':'는 한글에서도 그냥 ':' (sample_eq.hwpx로 확인)
+    r = convert(latex)
+    assert r.ok and ":" in r.script
+
+
 def test_documented_vocab_is_gated():
     r = convert(r"\exists x")
     assert not r.ok and "exists" in r.error and r.error_pos == 0
