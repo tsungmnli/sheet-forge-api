@@ -280,7 +280,7 @@ class Parser:
         if c == "|":
             return Sym("|", "|", "bar", pos)
         if c == "'":
-            return self.documented("prime", pos, "prime")
+            return Sym("prime", "prime", pos=pos)           # 프라임: rm B prime 으로 확인
         self.ctx.documented.append((c, pos))  # ; / * — 렌더링 미확인
         return Sym(c, c, pos=pos)
 
@@ -504,4 +504,131 @@ def parse(latex: str, ctx: Ctx):
     toks = lex(latex)
     p = Parser(toks, ctx)
     nodes = p.parse_seq()
+    return romanize(nodes)
+
+
+# ---------------------------------------------------------------- 로마체(rm)·이탤릭체(it) 기준
+# 기준(1단계):
+#  1) 영문 대문자 변수(점·도형 이름: A, B, ABC)는 rm. 단, 함수·첨자 기반(F(x), A^c, C_r)은 it로 둔다.
+#  2) 숫자 바로 뒤에 오는 단위(cm, km, kg, m^2 …)는 rm.
+#  3) 도형 기호(각·삼각형·합동·닮음…)가 대문자 사이에 끼면 한 번의 rm으로 이어서 묶는다.
+#  4) 그 밖의 소문자 변수(x, y, n …)는 it. rm 뒤에는 it로 되돌린다(emit이 처리).
+_GEO_CONNECT = frozenset({"angle", "triangle", "equiv", "cong", "sim", "parallel", "perp"})
+UNITS = frozenset({"mm", "cm", "m", "km", "mg", "g", "kg", "ml", "l", "s"})
+
+
+def _is_upper(n):
+    return isinstance(n, Var) and n.c.isascii() and n.c.isupper()
+
+
+def _is_func_like(nodes, i):
+    """대문자 뒤에 ( 가 오면 함수 이름(F(x))으로 본다."""
+    j = i + 1
+    while j < len(nodes) and _is_prime(nodes[j]):    # F'(x), F''(x)
+        j += 1
+    if j >= len(nodes):
+        return False
+    nx = nodes[j]
+    return isinstance(nx, Delim) and nx.open == "(" or (isinstance(nx, Sym) and nx.role == "open")
+
+
+def _eligible(nodes, i):
+    return _is_upper(nodes[i]) and not _is_func_like(nodes, i)
+
+
+def _is_prime(n):
+    return isinstance(n, Sym) and n.name == "prime"
+
+
+def _is_connect(n):
+    return isinstance(n, Sym) and n.name in _GEO_CONNECT
+
+
+def _wrap_units(nodes):
+    out, i = [], 0
+    while i < len(nodes):
+        out.append(nodes[i])
+        if isinstance(nodes[i], Num):
+            j, run = i + 1, []
+            while j < len(nodes):
+                n = nodes[j]
+                if isinstance(n, Var) and n.c.isascii() and n.c.isalpha():
+                    run.append(n)
+                elif isinstance(n, Script) and isinstance(n.base, Var) and n.base.c.isascii() and n.base.c.isalpha():
+                    run.append(n)
+                    break
+                else:
+                    break
+                j += 1
+            letters = "".join((r.base.c if isinstance(r, Script) else r.c) for r in run).lower()
+            if run and letters in UNITS:
+                out.append(Rm(run))
+                i = j + 1 if isinstance(run[-1], Script) else j
+                continue
+        i += 1
+    return out
+
+
+def _wrap_upper(nodes):
+    out, i, n = [], 0, len(nodes)
+    while i < n:
+        starts = _eligible(nodes, i) or (_is_connect(nodes[i]) and i + 1 < n and
+                                         (_eligible(nodes, i + 1) or _is_connect(nodes[i + 1])))
+        if not starts:
+            out.append(nodes[i]); i += 1
+            continue
+        j = i
+        while j < n:
+            if _eligible(nodes, j) or _is_connect(nodes[j]):
+                j += 1
+            elif _is_prime(nodes[j]) and j > i and (_is_upper(nodes[j - 1]) or _is_prime(nodes[j - 1])):
+                j += 1                                   # B' → rm B prime (프라임은 rm 안에 포함)
+            else:
+                break
+        run = nodes[i:j]
+        while run and _is_connect(run[-1]):      # 끝의 기호는 rm 밖으로
+            run.pop(); j -= 1
+        if any(_is_upper(x) for x in run):
+            out.append(Rm(run))
+        else:
+            out.extend(nodes[i:j])
+        i = max(j, i + 1)
+    return out
+
+
+def romanize(nodes):
+    """AST 전체에 rm/it 기준을 적용한다. 이미 Rm인 노드(\\mathrm)는 건드리지 않는다."""
+    nodes = _wrap_upper(_wrap_units(_flatten_primes([_descend(n) for n in nodes])))
     return nodes
+
+
+def _flatten_primes(nodes):
+    """B^{\\prime}, B^{'} 처럼 프라임만 윗첨자로 달린 형태를 B' 와 같은 B prime 나열로 편다."""
+    out = []
+    for n in nodes:
+        if (isinstance(n, Script) and isinstance(n.base, Var) and n.sub is None and n.sup
+                and all(_is_prime(x) for x in n.sup)):
+            out.append(n.base)
+            out.extend(n.sup)
+        else:
+            out.append(n)
+    return out
+
+
+def _descend(n):
+    if isinstance(n, Frac):
+        return Frac(romanize(n.num), romanize(n.den))
+    if isinstance(n, Sqrt):
+        return Sqrt(romanize(n.body), romanize(n.index) if n.index else n.index)
+    if isinstance(n, Script):
+        base = n.base if n.base is None or isinstance(n.base, (Var, Rm)) else _descend(n.base)
+        return Script(base, romanize(n.sub) if n.sub else n.sub, romanize(n.sup) if n.sup else n.sup)
+    if isinstance(n, Group):
+        return Group(romanize(n.body))
+    if isinstance(n, Delim):
+        return Delim(n.open, n.close, romanize(n.body), n.explicit)
+    if isinstance(n, Deco):
+        return Deco(n.kind, romanize(n.body))
+    if isinstance(n, Cases):
+        return Cases([[romanize(c) for c in r] for r in n.rows])
+    return n

@@ -118,7 +118,7 @@ def emit_node(n):
         rows = [" ~~ ".join(emit_seq(c) for c in r) for r in n.rows]
         return "cases{" + " # ".join(rows) + "}"
     if isinstance(n, Deco):
-        return n.kind + " {" + emit_seq(n.body) + "}"          # bar | arch | vec | dyad | dot
+        return n.kind + " {" + emit_seq(n.body, top=True) + "}"          # bar | arch | vec | dyad | dot
     raise MathError(f"방출할 수 없는 노드 {type(n).__name__}")
 
 
@@ -133,7 +133,7 @@ W = {"digit": 0.5, "var": 0.48, "op": 1.25, "op_rel": 1.46, "sign": 0.8, "greek"
 # 기호별 폭(스크립트 표기 기준). 여기 없는 기호는 아래 규칙으로 추정한다.
 SYM_W = {"LEQ": 1.62, "GEQ": 1.62, "!=": 1.48, "PLUSMINUS": 1.12, "times": 1.12, "DIVIDE": 1.12, "cdot": 1.06,
          "->": 1.19, "IN": 1.52, "notin": 1.79, "SUBSET": 2.08, "cup": 1.66, "cap": 1.66, "inf": 1.05,
-         "therefore": 1.05, "EMPTYSET": 1.05, "angle": 1.85, "triangle": 1.85, "CIRC": 1.17,
+         "therefore": 1.05, "EMPTYSET": 1.05, "angle": 1.85, "TRIANGLE": 1.85, "CIRC": 1.17,
          "lbrace": 0.54, "rbrace": 0.54, "int": 1.47}
 # 함수명 폭(뒤따르는 얇은 공백 포함). 없는 함수는 func_char × 글자 수.
 FUNC_W = {"sin": 1.45, "cos": 1.45, "tan": 1.5, "log": 1.46, "ln": 1.02, "lim": 1.5, "min": 1.8}

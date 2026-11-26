@@ -24,7 +24,9 @@ SYMBOLS = {
     "{": ("lbrace", VERIFIED), "}": ("rbrace", VERIFIED),
     # 기하. 평행·수직은 sample.hwpx(`bar{rm AB} ⫽ bar{rm CD}`, `bar {rm AB} BOT bar {rm CD}`)로 확인했다.
     # 평행은 VERT(‖)가 아니라 유니코드 ⫽(U+2AFD)다.
-    "angle": ("angle", VERIFIED), "triangle": ("triangle", VERIFIED),
+    "angle": ("angle", VERIFIED), "triangle": ("TRIANGLE", VERIFIED),   # rm 안에서는 대문자 TRIANGLE(△ABC)
+    "equiv": ("EQUIV", VERIFIED),      # 합동: rm TRIANGLE ABE EQUIV TRIANGLE BCF
+    "prime": ("prime", VERIFIED),      # B' → rm B prime
     "perp": ("BOT", VERIFIED), "parallel": ("⫽", VERIFIED),
     # 큰 연산자 (아래·위 첨자와 함께 쓰임)
     "sum": ("sum", VERIFIED), "int": ("int", VERIFIED),
@@ -33,7 +35,8 @@ SYMBOLS = {
     # --- 공식 문서 기준(렌더링 미확인) ---
     "exists": ("EXIST", DOCUMENTED), "supset": ("SUPSET", DOCUMENTED), "subseteq": ("SUBSETEQ", DOCUMENTED),
     "supseteq": ("SUPSETEQ", DOCUMENTED), "wedge": ("WEDGE", DOCUMENTED), "vee": ("VEE", DOCUMENTED),
-    "equiv": ("EQUIV", DOCUMENTED), "sim": ("SIM", DOCUMENTED), "cong": ("CONG", DOCUMENTED),
+    "sim": ("SIM", VERIFIED),          # 닮음: TRIANGLE rm ABC SIM TRIANGLE DEF (한글 확인)
+    "cong": ("CONG", VERIFIED),        # 합동(≅). 한글 입력은 ~= 이지만 거의 안 쓰여 CONG으로 둠
     "approx": ("APPROX", DOCUMENTED),
     "because": ("BECAUSE", DOCUMENTED), "cdots": ("cdots", DOCUMENTED), "ldots": ("LDOTS", DOCUMENTED),
     "prod": ("PROD", DOCUMENTED),

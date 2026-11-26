@@ -28,12 +28,12 @@ GOLDEN = [
     (r"\sum_{i=1}^{n}a_i", "sum _{i=1} ^{n} a _{i}"),
     (r"\lim_{x\to 0}f(x)", "lim _{x ->0} f (x)"),
     (r"\begin{cases}a\\b\end{cases}", "cases{a # b}"),
-    (r"x \in A", "x IN A"),
+    (r"x \in A", "x IN rm A"),                  # 대문자는 rm (test_math_roman)
     (r"|x|", "|x|"),
     (r"A^{c}", "A ^{c}"),
     (r"a \le b", "a LEQ b"),
     (r"a \ne b", "a != b"),
-    (r"\overline{AB}", "bar {AB}"),
+    (r"\overline{AB}", "bar {rm A B}"),
     (r"\dot{6}", "dot {6}"),
 ]
 
@@ -117,6 +117,12 @@ def _nz(s):
     return re.sub(r"[\s`~]+", "", s)
 
 
+def _nz_nofont(s):
+    # 정상 표기 비교용: 글꼴 지시(rm/it)는 명령이 유효한지와 무관하다. 갤러리는 로마체 기준(parser.romanize) 이전에 검증했으므로 양쪽에서 뺀다.
+    # 무효 표기는 rm/it 위치만 다른 경우가 있어(3 rm km + x 등) 뺄 수 없다. 그쪽은 _nz로 그대로 본다.
+    return _nz(re.sub(r"\b(?:rm|it)\b", " ", s))
+
+
 def _groups():
     g = defaultdict(lambda: {"ok": set(), "bad": set()})
     for name in ("math_gallery_v1_results.json", "math_gallery_v2_results.json"):
@@ -124,7 +130,10 @@ def _groups():
         if not path.exists():
             continue
         for x in json.loads(path.read_text(encoding="utf-8")):
-            g[x["latex"]]["ok" if x["verdict"] == "ok" else "bad"].add(_nz(x["script"]))
+            if x["verdict"] == "ok":
+                g[x["latex"]]["ok"].add(_nz_nofont(x["script"]))
+            else:
+                g[x["latex"]]["bad"].add(_nz(x["script"]))
     return [(k, v["ok"], v["bad"]) for k, v in g.items() if v["ok"]]
 
 
@@ -133,10 +142,11 @@ def test_corpus(latex, ok_set, bad_set):
     r = convert(latex, allow_documented=True)
     assert r.ok, r.error
     s = _nz(r.script)
+    s_ok = _nz_nofont(r.script)
     if latex in _PROMOTED:
         assert s.startswith("LEFT")
         return
     # 대부분의 명령은 대소문자 양쪽이 동작한다(4.3.1: in/IN). 함수명만 소문자 전용이라 무효 표기는 대소문자를 구분해 본다.
-    assert s.lower() in {t.lower() for t in ok_set}
+    assert s_ok.lower() in {t.lower() for t in ok_set}
     if not latex.isalpha():          # 'xin'은 공백 제거 후 무효 표기와 같아지므로(변수 분리 규칙) 따로 검증한다
         assert s not in bad_set
