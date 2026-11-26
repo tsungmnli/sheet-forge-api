@@ -28,6 +28,8 @@ MESSAGES = {
     "PHOTO_UNSUPPORTED": "이 사진 형식은 읽을 수 없어요. JPG, PNG, WebP, HEIC 사진을 올려 주세요.",
     "PHOTO_TOO_LARGE": "사진이 너무 커요. 20MB 이하 사진을 올려 주세요.",
     "ORIGINAL_EXPIRED": "원본 사진 보관 기간이 지나서 보정을 다시 할 수 없어요.",
+    "PAGE_BUSY": "사진을 정리하는 중이에요. 끝난 뒤에 다시 해 주세요.",
+    "PAGE_HAS_PROBLEMS": "옮긴 문제가 있는 사진은 다시 보정할 수 없어요. 옮긴 문제를 먼저 지워 주세요.",
     "PARENT_IN_TRASH": "먼저 위 단계(시험지 등)를 휴지통에서 복구해 주세요.",
     "READ_LIMIT": "오늘 읽기 한도에 도달했어요. 직접 입력은 계속할 수 있어요.",
     "TOO_MANY_SEGMENTS": "한 번에 읽을 수 있는 문제 수를 넘었어요. 나눠서 읽어 주세요.",

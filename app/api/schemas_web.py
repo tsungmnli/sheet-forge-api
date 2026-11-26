@@ -88,6 +88,16 @@ class PageDetailOut(PageOut):
     poll_after_ms: int | None = None
 
 
+class RecorrectIn(BaseModel):
+    """사진 다시 보정하기. corners는 manual에서만 쓰며, 원본을 rotation만큼 돌린 사진 기준 0~1 비율이다
+    (순서: 왼위·오른위·오른아래·왼아래)."""
+    model_config = ConfigDict(extra="forbid")
+    mode: Literal["auto", "none", "manual"]
+    rotation: Literal[0, 90, 180, 270] = 0
+    angle: float = Field(0.0, ge=-45.0, le=45.0)  # 보정이 끝난 결과에 더하는 미세 회전(시계 방향 °)
+    corners: list[list[float]] | None = None
+
+
 # ---- B2: 문제 칸·문제 요청 (웹 REST API 설계 5.3~5.5) ----
 class SegmentPatchIn(BaseModel):
     model_config = ConfigDict(extra="forbid")

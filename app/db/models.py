@@ -25,7 +25,7 @@ class Page(CommonColumns, Base):
     byte_size: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
     width: Mapped[int | None] = mapped_column(Integer, nullable=True)
     height: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    correction: Mapped[dict | None] = mapped_column(JSONB, nullable=True)  # null = 자동 보정
+    correction: Mapped[dict | None] = mapped_column(JSONB, nullable=True)  # {mode, rotation, corners, applied}. null = 자동(예전 사진)
     processing: Mapped[dict] = mapped_column(JSONB, nullable=False)       # {state, step, message}
     __table_args__ = (Index("ix_pages_exam_position", "exam_id", "position"),
                       Index("ix_pages_original_ref", "original_ref"),

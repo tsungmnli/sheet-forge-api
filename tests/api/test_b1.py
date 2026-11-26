@@ -88,7 +88,7 @@ class UnitTest(unittest.TestCase):
 
 
 class Boom:
-    def process(self, data, content_type):
+    def process(self, data, content_type, correction=None):
         raise RuntimeError("boom")
 
 

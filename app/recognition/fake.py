@@ -17,8 +17,8 @@ def _size(data: bytes):
 
 
 class FakePageProcessor:
-    def process(self, data: bytes, content_type: str) -> PageResult:
-        w, h = _size(data)
+    def process(self, data: bytes, content_type: str, correction: dict | None = None) -> PageResult:
+        w, h = _size(data)  # 보정 설정은 무시한다(보정 자체를 하지 않음)
         segments, n = [], 1
         for x0, x1 in _COLS:
             for y0, y1 in _ROWS:

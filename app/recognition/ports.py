@@ -21,11 +21,12 @@ class PageResult:
     message: str | None = None                        # B5-2c: 폴백 등 선생님께 보일 쉬운 문장(processing.message에 둔다)
     usage: "LlmResult | None" = None                 # B5-2c: 분할 LLM 사용량(B5-3c에서 usage_events에 기록)
     fallback_reason: str | None = None                # B5-2c: 로그·계측용 종류만
+    applied: dict | None = None                       # 실제로 쓴 보정 {corners, found, skew}. None이면 기록하지 않는다
 
 
 class PageProcessor(Protocol):
-    def process(self, data: bytes, content_type: str) -> PageResult:
-        """사진 한 장 → 보정본(선택), 크기, 문제 칸. 실패하면 예외."""
+    def process(self, data: bytes, content_type: str, correction: dict | None = None) -> PageResult:
+        """사진 한 장 → 보정본(선택), 크기, 문제 칸. correction은 선생님이 고른 보정 설정(None이면 자동). 실패하면 예외."""
         ...
 
 

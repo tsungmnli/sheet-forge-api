@@ -5,7 +5,7 @@
 from .llm.segment import DEFAULT_LONG_SIDE
 from .ports import LlmLimits, PageResult
 from .segmenter import detect_segments
-from .vision.correct import correct_page
+from .vision.correct import applied_info, apply_correction
 from .vision.decode import decode_image, encode_jpeg
 
 
@@ -13,11 +13,12 @@ class RealPageProcessor:
     def __init__(self, client, model: str, *, long_side: int = DEFAULT_LONG_SIDE, limits: LlmLimits | None = None):
         self.client, self.model, self.long_side, self.limits = client, model, long_side, limits
 
-    def process(self, data: bytes, content_type: str) -> PageResult:
-        image = correct_page(decode_image(data)).image
+    def process(self, data: bytes, content_type: str, correction: dict | None = None) -> PageResult:
+        c = apply_correction(decode_image(data), correction)
+        image = c.image
         jpeg = encode_jpeg(image)
         out = detect_segments(self.client, self.model, jpeg, long_side=self.long_side, limits=self.limits)
         w, h = image.size
         return PageResult(width=w, height=h, segments=out.segments, corrected=jpeg,
                           corrected_content_type="image/jpeg", message=out.message, usage=out.usage,
-                          fallback_reason=out.fallback_reason)
+                          fallback_reason=out.fallback_reason, applied=applied_info(c))

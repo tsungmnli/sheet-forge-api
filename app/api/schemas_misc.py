@@ -25,6 +25,10 @@ class SegmentsPutOut(BaseModel):
 ERR_SEGMENT = {404: {"model": ErrorOut, "description": "없거나 남의 것 (NOT_FOUND)"},
                409: {"model": ErrorOut, "description": "읽은 문제가 있는 칸 (SEGMENT_HAS_PROBLEM)"}}
 ERR_SEGMENTS_PUT = {**ERR_SEGMENT, 422: {"model": ErrorOut, "description": "요청 형식 오류 (REQUEST_INVALID)"}}
+ERR_RECORRECT = {404: {"model": ErrorOut, "description": "없거나 남의 것 (NOT_FOUND)"},
+                 409: {"model": ErrorOut, "description": "처리 중 (PAGE_BUSY) · 원본 만료 (ORIGINAL_EXPIRED) · "
+                                                         "옮긴 문제 있음 (PAGE_HAS_PROBLEMS)"},
+                 422: {"model": ErrorOut, "description": "모서리 값 오류 (REQUEST_INVALID)"}}
 
 
 # ---- 수식 점검 (5.6) ----

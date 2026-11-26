@@ -38,6 +38,13 @@ ONE = json.dumps({"problems": [{"number": "1", "box_2d": [150, 80, 850, 920],
 
 
 class ProcessorTest(unittest.TestCase):
+    def test_applies_correction_request(self):
+        r = RealPageProcessor(FakeClient(ONE), "m").process(photo(), "image/jpeg", correction={"mode": "none"})
+        self.assertEqual((r.width, r.height), (1600, 1200))
+        self.assertEqual(r.applied["corners"], [[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0]])
+        auto = RealPageProcessor(FakeClient(ONE), "m").process(photo(), "image/jpeg")
+        self.assertIn("found", auto.applied)
+
     def test_success_returns_corrected_jpeg_size_and_segments(self):
         r = RealPageProcessor(FakeClient(ONE), "m").process(photo(), "image/jpeg")
         im = Image.open(io.BytesIO(r.corrected))

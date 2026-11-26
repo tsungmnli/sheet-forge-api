@@ -1,12 +1,12 @@
-"""사진 작업실 (웹 REST API 설계 5.3). 칸 고르기·고치기·보정 수정은 B2 이후."""
+"""사진 작업실 (웹 REST API 설계 5.3). 칸 고르기·고치기·사진 다시 보정하기."""
 from fastapi import APIRouter, Depends, Request, Response
 from sqlalchemy.orm import Session
 
-from .. import segment_service, web_service as svc
+from .. import correction_service, segment_service, web_service as svc
 from ..concurrency import etag_json
 from ..deps import current_user, get_session
-from ..schemas_misc import ERR_SEGMENT, ERR_SEGMENTS_PUT, SegmentPatchOut, SegmentsPutOut
-from ..schemas_web import PageDetailOut, SegmentPatchIn, SegmentsPutIn
+from ..schemas_misc import ERR_RECORRECT, ERR_SEGMENT, ERR_SEGMENTS_PUT, SegmentPatchOut, SegmentsPutOut
+from ..schemas_web import PageDetailOut, RecorrectIn, SegmentPatchIn, SegmentsPutIn
 
 router = APIRouter()
 
@@ -36,3 +36,10 @@ def put_segments(page_id: str, body: SegmentsPutIn, owner: str = Depends(current
                  session: Session = Depends(get_session)):
     """"네모가 잘못됐어요" 저장: 칸 전체 목록으로 교체(id 있는 칸은 유지)."""
     return segment_service.replace_segments(session, owner, page_id, body.segments)
+
+
+@router.post("/pages/{page_id}/recorrect", status_code=202, response_model=PageDetailOut, responses=ERR_RECORRECT)
+def recorrect(page_id: str, body: RecorrectIn, owner: str = Depends(current_user),
+              session: Session = Depends(get_session)):
+    """사진 다시 보정하기: 설정 저장 → 칸 비우기 → 다시 처리. 끝날 때까지 processing을 폴링한다."""
+    return correction_service.recorrect(session, owner, page_id, body.mode, body.rotation, body.corners, body.angle)

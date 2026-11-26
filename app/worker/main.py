@@ -40,18 +40,26 @@ def _set_page_processing(db, page_id: str, processing: dict) -> None:
         s.commit()
 
 
+def _correction_request(correction: dict | None) -> dict:
+    """pages.correction에서 선생님이 고른 설정만 꺼낸다(applied 같은 결과 값은 뺀다). 없으면 자동."""
+    c = correction or {}
+    return {"mode": c.get("mode") or "auto", "rotation": int(c.get("rotation") or 0),
+            "angle": float(c.get("angle") or 0.0), "corners": c.get("corners")}
+
+
 def handle_page_process(db, store, processor, job: jobs.ClaimedJob) -> None:
     with db.session() as s:
         page = s.get(Page, job.target_id)
         if page is None or page.deleted_at is not None:
             return  # 그 사이 지워짐: 할 일 없음
-        original_ref = page.original_ref
+        original_ref, old_corrected = page.original_ref, page.corrected_ref
+        request = _correction_request(page.correction)
         page.processing = {"state": "running", "step": "correcting", "message": None}
         s.commit()
     obj = store.get(original_ref)
     if obj is None:
         raise StorageError("MISSING_ORIGINAL")
-    result = processor.process(obj[0], obj[1])
+    result = processor.process(obj[0], obj[1], correction=request)
     if result.usage is not None:  # B5-3c-2: 분할 LLM 사용량(가짜 처리기는 None)
         record_job_usage(db, job, [llm_event("segment", "", result.usage)])
     if result.fallback_reason:  # 종류만 남긴다(응답·사진 내용 없음)
@@ -66,6 +74,9 @@ def handle_page_process(db, store, processor, job: jobs.ClaimedJob) -> None:
             return
         page.corrected_ref, page.width, page.height = corrected_ref, result.width, result.height
         page.processing = {"state": "done", "step": None, "message": result.message}
+        # 처리하는 사이 선생님이 보정 설정을 또 바꿨으면 그 작업이 기록한다(덮어쓰지 않는다)
+        if result.applied is not None and _correction_request(page.correction) == request:
+            page.correction = {**request, "applied": result.applied}
         page.updated_at = func.now()
         has_segments = s.execute(select(func.count(Segment.id)).where(
             Segment.page_id == page.id, Segment.deleted_at.is_(None))).scalar_one()
@@ -74,6 +85,11 @@ def handle_page_process(db, store, processor, job: jobs.ClaimedJob) -> None:
                 s.add(Segment(id=new_id("seg"), owner_id=page.owner_id, page_id=page.id, exam_id=page.exam_id,
                               position=i, bbox=[float(v) for v in d.bbox], number=d.number))
         s.commit()
+    if old_corrected and old_corrected not in (original_ref, corrected_ref):  # 다시 보정: 예전 보정본 치우기
+        try:
+            store.delete(old_corrected)
+        except Exception:  # noqa: BLE001 — 남아도 정기 정리 대상
+            log.warning("예전 보정본 삭제 실패 page=%s", job.target_id)
 
 
 def run_once(db, store, processor, max_attempts: int = MAX_ATTEMPTS, retry_delay_s: float = 5,

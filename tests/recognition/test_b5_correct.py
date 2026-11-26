@@ -71,6 +71,32 @@ class CorrectTest(unittest.TestCase):
         self.assertEqual(res.corners, C.FULL)
         self.assertLess(abs(C.estimate_skew(np.array(res.image))), 1.0)
 
+    def test_fallback_ignores_background_pattern(self):
+        """글줄 없이 비스듬한 줄무늬(나뭇결·폰 화면 테두리 같은 것)만 있으면 돌리지 않는다."""
+        img = np.full((800, 600, 3), 200, np.uint8)
+        for y in range(-200, 1000, 18):  # 약 12°(탐색 범위 밖) 기운 줄무늬
+            cv2.line(img, (0, y), (600, y + 128), (60, 40, 20), 5)
+        self.assertEqual(C.estimate_skew(img), 0.0)
+
+    def test_fallback_records_skew(self):
+        tilted = cv2.warpAffine(_page(), cv2.getRotationMatrix2D((300, 400), 3.0, 1.0), (600, 800),
+                                borderMode=cv2.BORDER_REPLICATE)
+        res = C.correct_page(Image.fromarray(tilted))
+        self.assertAlmostEqual(abs(res.skew), 3.0, delta=1.0)
+
+    def test_apply_correction_modes(self):
+        im = Image.fromarray(_photo(QUAD))
+        plain = C.apply_correction(im, {"mode": "none", "rotation": 90})
+        self.assertEqual(plain.image.size, (1000, 1200))  # 원본 크기 그대로, 90° 회전만
+        self.assertEqual(plain.corners, C.FULL)
+        manual = C.apply_correction(im, {"mode": "manual", "corners": QUAD})
+        self.assertFalse(manual.auto)
+        self.assertTrue(C.apply_correction(im, None).auto)
+        info = C.applied_info(manual)
+        self.assertEqual(len(info["corners"]), 4)
+        with self.assertRaises(ValueError):
+            C.apply_correction(im, {"mode": "weird"})
+
     def test_manual_corners_and_rotation(self):
         res = C.correct_page(Image.fromarray(_photo(QUAD)), corners=QUAD)
         self.assertFalse(res.auto)
