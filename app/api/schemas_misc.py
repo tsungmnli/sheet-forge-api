@@ -80,5 +80,5 @@ HWPX_200 = {200: {"description": "format=json: 리포트와 base64 파일. forma
                               "X-Export-Errors": {"schema": {"type": "integer"}}}}}
 ERR_EXPORT = {404: {"model": ErrorOut, "description": "없거나 남의 것 (NOT_FOUND)"},
               409: {"model": ErrorOut, "description": "확인 안 끝난 문제 (NOT_CONFIRMED)"},
-              422: {"model": ErrorOut, "description": "내보낼 문제 없음·잘못된 모양 (EMPTY_EXPORT, PRESET_INVALID)"},
+              422: {"model": ErrorOut, "description": "내보낼 문제 없음·잘못된 모양 (EMPTY_EXPORT, PRESET_INVALID, SOURCE_NUMBER_MISSING)"},
               503: {"model": ErrorOut, "description": "DB·저장소 연결 실패 (DEPENDENCY_UNAVAILABLE)"}}

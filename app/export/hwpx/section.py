@@ -19,6 +19,11 @@ BOX_UNIT = 8504               # 샘플 글상자의 orgSz(정사각). 실제 크
 EQ_ID_BASE = 1_000_000_000    # 수식 id·zOrder도 카운터로 고유값 부여 [검증 t5: 0이어도 열리지만 고유값 권장]
 
 
+# 단 구분선·쪽 번호 [제안: 한글 확인 필요]. colLine은 colPr의 자식, pageNum은 colPr 뒤의 ctrl로 둔다.
+COL_LINE_XML = '<hp:colLine type="SOLID" width="0.12 mm" color="#000000"/>'
+PAGE_NUM_XML = '<hp:ctrl><hp:pageNum pos="BOTTOM_CENTER" formatType="DIGIT" sideChar="-"/></hp:ctrl>'
+
+
 def _need1(pattern: str, repl: str, text: str) -> str:
     new, n = re.subn(pattern, lambda _m: repl, text, count=1)
     if n != 1:
@@ -271,10 +276,12 @@ def render_section(template_xml: str, layout: LayoutContext, paragraphs: list) -
         r'<hp:margin [^>]*/>',
         f'<hp:margin header="{layout.header}" footer="{layout.footer}" gutter="{layout.gutter}" '
         f'left="{layout.left}" right="{layout.right}" top="{layout.top}" bottom="{layout.bottom}"/>', secpr_run)
-    secpr_run = _need1(
-        r'<hp:colPr [^>]*/>',
-        f'<hp:colPr id="" type="NEWSPAPER" layout="LEFT" colCount="{layout.col_count}" sameSz="1" '
-        f'sameGap="{layout.col_gap}"/>', secpr_run)
+    col_pr = (f'<hp:colPr id="" type="NEWSPAPER" layout="LEFT" colCount="{layout.col_count}" sameSz="1" '
+              f'sameGap="{layout.col_gap}"')
+    col_pr += f'>{COL_LINE_XML}</hp:colPr>' if layout.col_divider else '/>'
+    secpr_run = _need1(r'<hp:colPr [^>]*/>', col_pr, secpr_run)
+    if layout.page_number:   # 쪽 번호는 쪽 설정과 같은 첫 문단의 run 끝에 둔다
+        secpr_run = _need1(r'</hp:ctrl></hp:run>$', f'</hp:ctrl>{PAGE_NUM_XML}</hp:run>', secpr_run)
 
     ctx = _Ctx(layout.eq_font_hwp)
     first_pr, first_parts = paragraphs[0]

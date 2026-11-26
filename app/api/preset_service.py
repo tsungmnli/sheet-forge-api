@@ -12,6 +12,7 @@ from .errors import ApiError
 from .repo import alive, soft_delete, update_versioned
 
 BUILTIN_PREFIX = "builtin_"
+DEFAULT_PRESET_NAME = "내 기본 모양"
 _BUILTIN_DEFS = [
     ("builtin_a4_1col", "A4 한 칸", {}),
     ("builtin_b5_2col", "B5 두 칸", {"paper": {"kind": "B5", "width_mm": 182, "height_mm": 257},
@@ -60,6 +61,22 @@ def get_preset_value(session, owner: str, pid: str) -> dict:
         if b["id"] == pid:
             return b["preset"]
     return _load(session, owner, pid).preset
+
+
+def save_my_default(session, owner: str, current_id: str | None, raw: dict) -> str:
+    """내 기본 모양으로 저장하고 그 id를 돌려준다. 이미 내 모양이 기본이면 그 값을 덮어써서(모양이 쌓이지 않게),
+    없거나 내장 모양이거나 지워졌으면 "내 기본 모양"을 새로 만든다. 커밋은 호출하는 쪽이 한다."""
+    preset = _validated(raw)
+    if current_id and not current_id.startswith(BUILTIN_PREFIX):
+        rec = session.execute(select(ExportPresetRecord).where(ExportPresetRecord.id == current_id,
+                                                               *alive(ExportPresetRecord, owner))).scalar_one_or_none()
+        if rec is not None:
+            update_versioned(session, ExportPresetRecord, rec.id, owner, rec.version, {"preset": preset})
+            return rec.id
+    rec = ExportPresetRecord(id=new_id("preset"), owner_id=owner, name=DEFAULT_PRESET_NAME, preset=preset)
+    session.add(rec)
+    session.flush()
+    return rec.id
 
 
 def list_presets(session, owner: str) -> dict:

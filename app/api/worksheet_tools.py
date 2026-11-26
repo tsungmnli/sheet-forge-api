@@ -1,4 +1,6 @@
 """문제 담기 패널의 검색과 만들기 전 점검 (웹 REST API 설계 5.6·5.7). 파일을 만들거나 이미지를 열지 않는다."""
+from collections import Counter
+
 from sqlalchemy import select, tuple_
 
 from ..db.models import Exam, Problem, Segment, WorksheetItem
@@ -60,8 +62,12 @@ def check_worksheet(session, owner: str, wid: str) -> dict:
         plan_layout(ExportPreset.from_dict(ws.preset))
     except PresetError:
         add("PRESET_INVALID", "error", "모양 값이 올바르지 않아요. 모양을 다시 정해 주세요.")
-    rows = session.scalars(select(Problem).join(WorksheetItem, WorksheetItem.problem_id == Problem.id)
-                           .where(WorksheetItem.worksheet_id == ws.id).order_by(WorksheetItem.position)).all()
+    pairs = session.execute(select(Problem, Segment.number)
+                            .join(WorksheetItem, WorksheetItem.problem_id == Problem.id)
+                            .outerjoin(Segment, Segment.id == Problem.segment_id)
+                            .where(WorksheetItem.worksheet_id == ws.id).order_by(WorksheetItem.position)).all()
+    rows = [p for p, _ in pairs]
+    source_numbers = {p.id: (number or "").strip() for p, number in pairs}
     deleted = [p for p in rows if p.deleted_at is not None]
     live = [p for p in rows if p.deleted_at is None]
     unconfirmed = [p for p in live if p.status != "confirmed"]
@@ -81,6 +87,18 @@ def check_worksheet(session, owner: str, wid: str) -> dict:
     if deleted:
         add("DELETED", "warn", f"지운 문제가 {len(deleted)}개 있어요. 파일에는 들어가지 않아요.",
             problem_ids=[p.id for p in deleted])
+    if ((ws.preset or {}).get("numbering") or {}).get("mode") == "source":
+        no_number = [p.id for p in exportable if not source_numbers[p.id]]
+        if no_number:
+            add("SOURCE_NUMBER_MISSING", "error",
+                f"원래 번호가 없는 문제가 {len(no_number)}개 있어요. 문항 번호를 '순서대로'로 바꾸거나 그 문제를 빼 주세요.",
+                problem_ids=no_number)
+        counts = Counter(source_numbers[p.id] for p in exportable if source_numbers[p.id])
+        repeated = [p.id for p in exportable if counts[source_numbers[p.id]] > 1]
+        if repeated:
+            add("SOURCE_NUMBER_DUPLICATE", "warn",
+                f"원래 번호가 겹치는 문제가 {len(repeated)}개 있어요. 파일에도 같은 번호로 들어가요.",
+                problem_ids=repeated)
     for p in exportable:
         if figure_missing(p.content):
             add("FIGURE_MISSING", "warn", "그림이 없는 문제가 있어요", problem_id=p.id)

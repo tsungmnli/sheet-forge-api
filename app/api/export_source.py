@@ -5,7 +5,7 @@
 """
 from sqlalchemy import select
 
-from ..db.models import Problem, Worksheet, WorksheetItem
+from ..db.models import Problem, Segment, Worksheet, WorksheetItem
 from .errors import ApiError
 from .repo import alive
 
@@ -18,8 +18,11 @@ def load_worksheet(session, owner: str, wid: str) -> Worksheet:
 
 
 def load_problems(session, ws: Worksheet) -> list:
-    """담은 순서대로 [{id, status, content, exam_id}]. 삭제된 문제는 빠진다."""
-    rows = session.scalars(select(Problem).join(WorksheetItem, WorksheetItem.problem_id == Problem.id)
+    """담은 순서대로 [{id, status, content, exam_id, source_number}]. 삭제된 문제는 빠진다."""
+    rows = session.execute(select(Problem, Segment.number)
+                           .join(WorksheetItem, WorksheetItem.problem_id == Problem.id)
+                           .outerjoin(Segment, Segment.id == Problem.segment_id)
                            .where(WorksheetItem.worksheet_id == ws.id, Problem.deleted_at.is_(None))
                            .order_by(WorksheetItem.position)).all()
-    return [{"id": p.id, "status": p.status, "content": p.content or {}, "exam_id": p.exam_id} for p in rows]
+    return [{"id": p.id, "status": p.status, "content": p.content or {}, "exam_id": p.exam_id,
+             "source_number": number} for p, number in rows]

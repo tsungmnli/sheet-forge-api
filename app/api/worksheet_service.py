@@ -2,6 +2,7 @@
 
 번호는 내보내기(exporter)와 같은 규칙이다: 삭제된 문제는 번호가 없고, unconfirmed_policy="skip"이면
 확인 완료가 아닌 문제도 번호가 없다(내보내기에서 빠지므로 세지 않는다).
+numbering.mode="source"면 새로 매기지 않고 원래 번호를 그대로 쓴다(원래 번호가 없으면 번호 없음).
 커밋은 이 모듈의 공개 함수가 한다.
 """
 import copy
@@ -12,15 +13,21 @@ from ..db.ids import new_id
 from ..db.models import Exam, Page, Problem, Segment, Worksheet, WorksheetItem
 from ..export.hwpx import ExportPreset, PresetError, plan_layout
 from .errors import ApiError
+from .me_service import default_preset_value
 from .pagination import decode_cursor, encode_cursor
 from .preset_service import get_preset_value
 from .problem_logic import preview, preview_tex
 from .repo import alive, soft_delete, update_versioned
 from .serialize import image_url, iso
 
-def assign_numbers(flags: list, preset: dict, policy: str) -> list:
-    """flags = [(삭제됨, 상태), ...] 순서대로 번호(문자열) 또는 None을 돌려준다."""
+def assign_numbers(flags: list, preset: dict, policy: str, sources: list | None = None) -> list:
+    """flags = [(삭제됨, 상태), ...] 순서대로 번호(문자열) 또는 None을 돌려준다.
+    sources는 flags와 같은 순서의 원래 번호 목록이며 mode="source"일 때만 쓴다."""
     numbering = (preset or {}).get("numbering") or {}
+    if numbering.get("mode") == "source":
+        sources = sources or [None] * len(flags)
+        return [None if deleted or (policy != "fail" and status != "confirmed") else ((src or "").strip() or None)
+                for (deleted, status), src in zip(flags, sources)]
     fmt = numbering.get("format") or "{n:02d}"
     n = numbering.get("start", 1)
     out = []
@@ -92,7 +99,7 @@ def worksheet_view(session, ws: Worksheet) -> dict:
         .where(WorksheetItem.worksheet_id == ws.id)
         .order_by(WorksheetItem.position)).all()
     numbers = assign_numbers([(p.deleted_at is not None, p.status) for p, _, _, _ in rows],
-                             ws.preset, ws.unconfirmed_policy)
+                             ws.preset, ws.unconfirmed_policy, [snum for *_, snum in rows])
     items = [{"problem_id": p.id, "number": num, "status": p.status, "deleted": p.deleted_at is not None,
               "exam": {"id": eid, "title": etitle or ""}, "preview": preview(p.content or {}),
               "preview_tex": preview_tex(p.content or {}),
@@ -150,7 +157,7 @@ def create_worksheet(session, owner: str, body, settings) -> str:
         _require_problems(session, owner, ids)
     _check_limit(len(ids), settings)
     ws = Worksheet(id=new_id("ws"), owner_id=owner, title=body.title, student=student,
-                   preset=ExportPreset().to_dict())
+                   preset=default_preset_value(session, owner))   # 내 기본 모양이 있으면 그것으로 시작
     session.add(ws)
     session.flush()
     _replace_items(session, ws.id, ids)

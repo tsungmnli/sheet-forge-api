@@ -18,6 +18,7 @@ MESSAGES = {
     "PROBLEM_CONFIRMED": "확인을 마친 문제는 바로 고칠 수 없어요. '다시 확인하기'를 먼저 눌러 주세요.",
     "PROBLEM_BUSY": "지금 문제를 읽는 중이에요. 끝난 뒤에 고칠 수 있어요.",
     "MATH_UNSUPPORTED": "아직 한글 수식으로 바꿀 수 없는 수식이 있어요.",
+    "SOURCE_NUMBER_MISSING": "원래 번호가 없는 문제가 있어요. 문항 번호를 '순서대로'로 바꾸거나 그 문제를 빼 주세요.",
     "EMPTY_PROBLEM": "문제 내용이 비어 있어요.",
     "SEGMENT_HAS_PROBLEM": "이미 읽은 문제가 있는 칸이에요. 문제를 먼저 지워 주세요.",
     "FIGURE_REF_INVALID": "이 문제의 그림이 아니에요.",

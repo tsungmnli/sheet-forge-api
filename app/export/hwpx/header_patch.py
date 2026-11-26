@@ -6,7 +6,9 @@ from .errors import TemplateError
 from .layout import LayoutContext
 from .registry import StyleRegistry
 
-_FONT_LANGS = ("HANGUL", "LATIN")  # [검증 t17b]
+# 글자 종류별 글꼴 칸 전부(hh:fontRef 속성 순서). 일부만 바꾸면 기호·한자 등이 템플릿 글꼴로 남는다.
+# HANGUL·LATIN은 [검증 t17b], 나머지는 [제안: 한글 확인 필요]
+_FONT_LANGS = ("HANGUL", "LATIN", "HANJA", "JAPANESE", "OTHER", "SYMBOL", "USER")
 
 
 def _fontface_span(xml: str, lang: str):
@@ -44,8 +46,8 @@ def patch_header(header_xml: str, layout: LayoutContext, font_name: str, registr
         raise TemplateError("charPr id=0을 찾지 못함")
     c = m.group(0)
     c = re.sub(r'(<hh:charPr id="0" height=")\d+(")', rf'\g<1>{layout.font_hwp}\2', c, count=1)
-    c, n = re.subn(r'<hh:fontRef hangul="\d+" latin="(\d+)"',
-                   f'<hh:fontRef hangul="{font_ids["HANGUL"]}" latin="{font_ids["LATIN"]}"', c, count=1)
+    refs = " ".join(f'{lang.lower()}="{font_ids[lang]}"' for lang in _FONT_LANGS)
+    c, n = re.subn(r'<hh:fontRef [^>]*/>', f'<hh:fontRef {refs}/>', c, count=1)
     if n != 1:
         raise TemplateError("charPr 0의 fontRef를 찾지 못함")
     xml = xml[:m.start()] + c + xml[m.end():]

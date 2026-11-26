@@ -3,7 +3,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 
 from .builders import Equation, ParagraphSpec, Picture, blank_paragraph, build_problem_paragraphs
-from .errors import EmptyExportError, UnconfirmedProblemError
+from .errors import EmptyExportError, MissingNumberError, UnconfirmedProblemError
 from .header_patch import patch_header
 from .layout import LayoutContext, plan_layout
 from .package import build_zip, patch_hpf, strip_preview
@@ -50,6 +50,11 @@ def _preset(p) -> ExportPreset:
     return preset
 
 
+def _source_number(problem: dict) -> str:
+    """원래 번호 문자열. 없으면 빈 문자열. XML에 넣을 수 없는 제어 문자는 뺀다."""
+    return "".join(ch for ch in str(problem.get("source_number") or "") if ch.isprintable()).strip()
+
+
 def _para_id(reg: StyleRegistry, layout: LayoutContext, s: ParagraphSpec) -> int:
     if s.role == "table":  # 표: 칸 안 문단은 가운데 정렬, 표를 담는 문단도 가운데 정렬
         b = s.parts[0]
@@ -83,22 +88,29 @@ def export_hwpx(req: ExportRequest) -> ExportResult:
         chosen.append(p)
     if not chosen:
         raise EmptyExportError("내보낼 문항이 없음")
+    # 원래 번호를 쓰는데 번호가 없는 문항이 있으면 번호를 지어내지 않고 멈춘다
+    by_source = preset.numbering.mode == "source"
+    if by_source:
+        missing = sum(1 for p in chosen if not _source_number(p))
+        if missing:
+            raise MissingNumberError(f"원래 번호가 없는 문항: {missing}개")
     # S1
     tpl = Template.load(req.template_path)
     header = tpl.text("Contents/header.xml")
-    # S2·S3 문항 → 문단 명세 (번호는 내보낼 때 재부여, 6.1-6)
+    # S2·S3 문항 → 문단 명세 (번호는 numbering.mode에 따라 내보낼 때 재부여하거나 원래 번호를 쓴다)
     specs: list = []
     n_text = 0
     emitted = 0  # 그림을 못 찾아 제외된 문항은 번호를 쓰지 않는다
     for prob in chosen:
-        number = preset.numbering.format.format(n=preset.numbering.start + emitted)
+        number = (_source_number(prob) if by_source
+                  else preset.numbering.format.format(n=preset.numbering.start + emitted))
         ps = build_problem_paragraphs(prob, number, report, layout, preset.choices.safety_ratio,
                                       req.images, preset.figures.default_width_mm)
         if ps is None:
             continue
         emitted += 1
         specs.extend(ps)
-        specs.append(blank_paragraph())
+        specs.extend(blank_paragraph() for _ in range(preset.spacing.blank_lines))
     if not specs:
         raise EmptyExportError("내보낼 문항이 없음(모든 문항이 제외됨)")
     pics = [p for s in specs for p in s.parts if isinstance(p, Picture)]

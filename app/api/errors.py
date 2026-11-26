@@ -8,7 +8,8 @@ from sqlalchemy.exc import InterfaceError, OperationalError
 from sqlalchemy.exc import TimeoutError as PoolTimeoutError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from ..export.hwpx import EmptyExportError, ExportError, PresetError, UnconfirmedProblemError
+from ..export.hwpx import (EmptyExportError, ExportError, MissingNumberError, PresetError,
+                           UnconfirmedProblemError)
 from ..storage.images import StorageError
 from .messages import friendly
 
@@ -67,6 +68,10 @@ def register_error_handlers(app: FastAPI) -> None:
     @app.exception_handler(EmptyExportError)
     async def _empty(request: Request, exc: EmptyExportError):
         return error_response(request, 422, "EMPTY_EXPORT", str(exc))
+
+    @app.exception_handler(MissingNumberError)
+    async def _missing_number(request: Request, exc: MissingNumberError):
+        return error_response(request, 422, "SOURCE_NUMBER_MISSING", friendly("SOURCE_NUMBER_MISSING"))
 
     @app.exception_handler(UnconfirmedProblemError)
     async def _unconfirmed(request: Request, exc: UnconfirmedProblemError):

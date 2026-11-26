@@ -26,6 +26,8 @@ class LayoutContext:
     line_spacing_pct: int
     align: str             # JUSTIFY | LEFT
     eq_hwp: int = 0        # 수식 크기 HWPUNIT = pt × 100 (= 수식 baseUnit). 0이면 글자 크기를 따른다
+    col_divider: bool = False   # 단 구분선(2단 이상일 때만 True)
+    page_number: bool = False   # 쪽 번호(아래 가운데, "- 1 -")
 
     @property
     def eq_font_hwp(self) -> int:
@@ -64,4 +66,5 @@ def plan_layout(preset: ExportPreset) -> LayoutContext:
         col_count=n, col_gap=gap, page_horizontal=horizontal, body_w=body, col_w=col,
         font_hwp=round(preset.typography.font_size_pt * 100),
         eq_hwp=round(preset.typography.equation_size_pt * 100),
-        line_spacing_pct=preset.typography.line_spacing_pct, align=align)
+        line_spacing_pct=preset.typography.line_spacing_pct, align=align,
+        col_divider=preset.columns.divider and n >= 2, page_number=preset.page_number.enabled)

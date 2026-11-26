@@ -31,6 +31,7 @@ class Margins:
 class Columns:
     count: int = 1
     gap_mm: float | None = None
+    divider: bool = False   # 단 사이 세로 구분선(2단 이상일 때만 그려짐)
 
 
 @dataclass
@@ -46,11 +47,18 @@ class Typography:
 class Numbering:
     format: str = "{n:02d}"
     start: int = 1
+    mode: str = "sequence"  # sequence: 담은 순서대로 새로 매김 | source: 시험지의 원래 번호 그대로
+
+
+@dataclass
+class PageNumber:
+    enabled: bool = False   # 쪽 아래 가운데에 "- 1 -" 모양으로 넣음
 
 
 @dataclass
 class Spacing:
     between_problems: str = "blank_paragraph"
+    blank_lines: int = 1   # 문제 사이 빈 줄 수(풀이 공간). 0~20
 
 
 @dataclass
@@ -81,6 +89,7 @@ class ExportPreset:
     choices: Choices = field(default_factory=Choices)
     figures: Figures = field(default_factory=Figures)
     equation: Equation = field(default_factory=Equation)
+    page_number: PageNumber = field(default_factory=PageNumber)
     on_unconfirmed: str = "skip"  # skip | fail
 
     @classmethod
@@ -180,6 +189,11 @@ def validate_preset(p: ExportPreset) -> list:
         err("PRESET_COLUMNS", "단 간격은 0 이상의 숫자 또는 null")
         cols_ok = False
 
+    if not isinstance(c.divider, bool):
+        err("PRESET_COLUMNS", "단 구분선은 true 또는 false")
+    if not isinstance(p.page_number.enabled, bool):
+        err("PRESET_PAGE_NUMBER", "쪽 번호는 true 또는 false")
+
     t = p.typography
     if not (isinstance(t.font_name, str) and t.font_name.strip()) or any(ord(ch) < 32 for ch in str(t.font_name)):
         err("PRESET_FONT", "글꼴 이름이 비어 있거나 잘못됨")
@@ -194,6 +208,8 @@ def validate_preset(p: ExportPreset) -> list:
         err("PRESET_ALIGN", "align은 auto/left/justify")
 
     n = p.numbering
+    if n.mode not in ("sequence", "source"):
+        err("PRESET_NUMBERING", "numbering.mode는 sequence/source")
     if not (isinstance(n.start, int) and not isinstance(n.start, bool)):
         err("PRESET_NUMBERING", "numbering.start는 정수")
     else:
@@ -204,6 +220,9 @@ def validate_preset(p: ExportPreset) -> list:
 
     if p.spacing.between_problems != "blank_paragraph":
         err("PRESET_SPACING", "between_problems는 blank_paragraph만 지원")
+    bl = p.spacing.blank_lines
+    if not (isinstance(bl, int) and not isinstance(bl, bool) and 0 <= bl <= 20):  # [제안]
+        err("PRESET_SPACING", "blank_lines는 0~20의 정수")
     if p.choices.layout != "auto":
         err("PRESET_CHOICES", "choices.layout은 auto만 지원")
     if p.equation.size_mode not in ("auto", "estimated"):

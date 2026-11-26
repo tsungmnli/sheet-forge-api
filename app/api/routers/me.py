@@ -29,6 +29,15 @@ def get_my_settings(owner: str = Depends(current_user), session: Session = Depen
     return svc.get_settings(session, owner)
 
 
+@router.post("/me/default-preset", response_model=SettingsOut,
+             responses={404: {"description": "문제지를 찾을 수 없음 (NOT_FOUND)"}})
+def save_my_default_preset(body: svc.DefaultPresetIn, owner: str = Depends(current_user),
+                           session: Session = Depends(get_session)):
+    """이 문제지의 지금 모양을 내 기본 모양으로 저장한다. 앞으로 만드는 새 문제지가 이 모양으로 시작하고,
+    이미 만든 문제지는 바뀌지 않는다. 응답은 바뀐 뒤의 전체 설정."""
+    return svc.save_default_preset(session, owner, body)
+
+
 @router.patch("/me/settings", response_model=SettingsOut,
               responses={422: {"description": "잘못된 설정 값 (REQUEST_INVALID)"}})
 def patch_my_settings(body: svc.SettingsPatch, owner: str = Depends(current_user), session: Session = Depends(get_session)):

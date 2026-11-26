@@ -19,6 +19,12 @@ class EmptyExportError(ExportError):
     code = "EMPTY_EXPORT"
 
 
+class MissingNumberError(ExportError):
+    """원래 번호 그대로(numbering.mode='source')인데 원래 번호가 없는 문항이 있다."""
+
+    code = "SOURCE_NUMBER_MISSING"
+
+
 class UnconfirmedProblemError(ExportError):
     code = "NOT_CONFIRMED"
 

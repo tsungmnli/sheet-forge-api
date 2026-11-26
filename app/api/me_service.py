@@ -2,12 +2,14 @@
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
-from sqlalchemy import func
+from sqlalchemy import func, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
-from ..db.models import UserSettings
+from ..db.models import UserSettings, Worksheet
+from ..export.hwpx import ExportPreset, PresetError, plan_layout
 from .errors import ApiError
-from .preset_service import get_preset_value
+from .preset_service import get_preset_value, save_my_default
+from .repo import alive
 
 DEFAULTS = {
     "font_scale": 100,                       # 글자 크기 배율(%)
@@ -28,6 +30,12 @@ class SettingsPatch(BaseModel):
     auto_next_after_confirm: bool | None = None
 
 
+class DefaultPresetIn(BaseModel):
+    """이 문제지의 지금 모양을 내 기본 모양으로 저장한다."""
+    model_config = ConfigDict(extra="forbid")
+    worksheet_id: str = Field(min_length=1, max_length=40)
+
+
 def me(owner: str, email: str | None = None) -> dict:
     out = {"id": owner, "display_name": "선생님"}   # 표시 이름은 아직 고정 값
     if email is not None:
@@ -38,6 +46,29 @@ def me(owner: str, email: str | None = None) -> dict:
 def get_settings(session, owner: str) -> dict:
     row = session.get(UserSettings, owner)
     return {**DEFAULTS, **(row.data if row else {})}
+
+
+def default_preset_value(session, owner: str) -> dict:
+    """새 문제지가 처음 가지는 모양. 내 기본 모양이 있으면 그 값, 없거나 못 쓰면(지웠거나 형식이 바뀜) 기본값."""
+    pid = get_settings(session, owner).get("default_preset_id")
+    if pid:
+        try:
+            preset = ExportPreset.from_dict(get_preset_value(session, owner, pid))
+            plan_layout(preset)
+            return preset.to_dict()
+        except (ApiError, PresetError):
+            pass
+    return ExportPreset().to_dict()
+
+
+def save_default_preset(session, owner: str, body: DefaultPresetIn) -> dict:
+    ws = session.execute(select(Worksheet).where(Worksheet.id == body.worksheet_id,
+                                                 *alive(Worksheet, owner))).scalar_one_or_none()
+    if ws is None:
+        raise ApiError(404, "NOT_FOUND")
+    pid = save_my_default(session, owner, get_settings(session, owner).get("default_preset_id"), ws.preset)
+    session.commit()
+    return patch_settings(session, owner, SettingsPatch(default_preset_id=pid))
 
 
 def patch_settings(session, owner: str, body: SettingsPatch) -> dict:
