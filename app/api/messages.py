@@ -23,7 +23,7 @@ MESSAGES = {
     "FIGURE_REF_INVALID": "이 문제의 그림이 아니에요.",
     "FIGURE_IMAGE_TOO_LARGE": "지운 그림이 너무 커요. 그림을 줄여서 다시 시도해 주세요.",
     "FIGURE_IMAGE_INVALID": "지운 그림을 저장할 수 없어요. 다시 시도해 주세요.",
-    "FIGURE_NOT_CLEANED": "정리 단계를 고른 그림에서만 지울 수 있어요.",
+    "FIGURE_NOT_CLEANED": "지울 그림이 아직 준비되지 않았어요.",
     "PHOTO_UNSUPPORTED": "이 사진 형식은 읽을 수 없어요. JPG, PNG, WebP, HEIC 사진을 올려 주세요.",
     "PHOTO_TOO_LARGE": "사진이 너무 커요. 20MB 이하 사진을 올려 주세요.",
     "ORIGINAL_EXPIRED": "원본 사진 보관 기간이 지나서 보정을 다시 할 수 없어요.",

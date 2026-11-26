@@ -208,6 +208,13 @@ class FigureAddIn(BaseModel):
 class FigureCleanLevelIn(BaseModel):
     model_config = ConfigDict(extra="forbid")
     level: int = Field(ge=0, le=4)   # 0 = 원본, 1~4 = 정리 세기
+    color: Literal["keep", "erase"] | None = None   # 색 처리. 안 보내면 지금 값을 그대로 둔다
+
+
+class FigureEraseColorsIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    level: int = Field(ge=1, le=4)                         # 정리 세기
+    hues: list[int] = Field(min_length=1, max_length=6)    # 지울 색의 색상 값(그림의 palette에 있는 것만)
 
 
 class FigureRegionIn(BaseModel):

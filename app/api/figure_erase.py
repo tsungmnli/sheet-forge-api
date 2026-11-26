@@ -11,6 +11,14 @@ RATIO_TOLERANCE = 0.02   # 기준 그림과 가로세로 비율이 이만큼까�
 _PNG_MAGIC = b"\x89PNG\r\n\x1a\n"
 
 
+def erase_base_ref(fig: dict) -> str | None:
+    """낙서 지우개가 손볼 그림의 ref. 화면에 보이는 그림과 같은 규칙이다(원본을 고른 그림은 raw_ref, 아니면 정리본,
+    정리본이 없으면 원본). 정리 단계를 안 고른 그림(원본)이나 색이 남은 그림에서도 지울 수 있게 한다."""
+    if fig.get("use") == "raw":
+        return fig.get("raw_ref")
+    return fig.get("clean_ref") or fig.get("raw_ref")
+
+
 def _invalid() -> ApiError:
     return ApiError(422, "FIGURE_IMAGE_INVALID")
 

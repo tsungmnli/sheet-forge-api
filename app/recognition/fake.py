@@ -46,5 +46,8 @@ class FakeRecognizer:
 class FakeFigureCleaner:
     """가짜 FigureCleaner: 정리 없이 원본 그림을 그대로 정리본으로 돌려준다. B5에서 교체."""
 
-    def clean(self, raw: bytes, level: int = 2) -> CleanResult:
+    def clean(self, raw: bytes, level: int = 2, keep_color: bool = False, erase_hues=None) -> CleanResult:
         return CleanResult(clean=raw, content_type=None)
+
+    def palette(self, raw: bytes) -> list:
+        return []

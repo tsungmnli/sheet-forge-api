@@ -27,8 +27,9 @@ def _png(arr):
 class FigureCleanTest(unittest.TestCase):
     def test_color_scribble_removed_and_lines_kept(self):
         img = _figure()
-        cv2.line(img, (20, 30), (300, 220), (230, 30, 30), 5)      # 빨간 펜
-        cv2.rectangle(img, (60, 90), (200, 130), (60, 80, 230), -1)  # 파란 형광펜 면
+        # 낙서가 잉크의 대부분을 차지하면 과제거(인쇄된 색 그림)로 보고 정리본을 버리므로, 낙서는 잉크의 절반 아래로 둔다
+        cv2.line(img, (20, 30), (300, 220), (230, 30, 30), 3)      # 빨간 펜
+        cv2.rectangle(img, (100, 100), (140, 125), (60, 80, 230), -1)  # 파란 형광펜 면
         res = FigureCleaner().clean(_png(img))
         self.assertIsNotNone(res.clean)
         self.assertEqual(res.content_type, "image/png")
@@ -45,6 +46,34 @@ class FigureCleanTest(unittest.TestCase):
     def test_fully_colored_figure_is_over_removed(self):
         res = FigureCleaner().clean(_png(_figure(line=(30, 60, 230))))
         self.assertIsNone(res.clean)
+
+    def test_over_removal_counts_ink_before_color_removal(self):
+        # 정리 전 잉크를 색 제거 뒤에 세면 지워진 색은 안 세어져 과제거가 안 잡힌다. 검정 선은 조금, 파란 면은 크게
+        # 있는 그림에서 색을 지우면 잉크 대부분이 사라지므로 기본 단계는 정리본을 버려야 한다.
+        img = _figure()
+        cv2.rectangle(img, (20, 20), (300, 220), (60, 80, 230), -1)
+        res = FigureCleaner().clean(_png(img))
+        self.assertIsNone(res.clean)
+        # 색 유지를 고르면 같은 그림도 버리지 않는다(밝기로만 판단)
+        self.assertIsNotNone(FigureCleaner().clean(_png(img), keep_color=True).clean)
+
+    def test_keep_color_keeps_printed_color_lines(self):
+        # 파란색으로 인쇄된 그림: 기본(색 제거)은 지워 버리지만, keep_color면 선이 남는다
+        img = _figure(line=(30, 60, 230))
+        res = FigureCleaner().clean(_png(img), keep_color=True)
+        self.assertIsNotNone(res.clean)
+        out = np.array(Image.open(io.BytesIO(res.clean)))
+        base, _, _ = clean_figure(_figure(line=(20, 20, 20)))
+        self.assertGreater(float((out < 128).mean()), float((base < 128).mean()) * 0.6)
+        for lv in (1, 3):   # 사용자가 고른 단계도 선을 남긴다(4단계는 밝기 기준이 엄격해 중간 밝기 파랑은 사라질 수 있다)
+            o, _, _ = clean_figure(img, lv, keep_color=True)
+            self.assertGreater(float((o < 128).mean()), 0.005)
+
+    def test_keep_color_does_not_change_default(self):
+        img = _figure()
+        a, _, _ = clean_figure(img)
+        b, _, _ = clean_figure(img, keep_color=False)
+        self.assertTrue(np.array_equal(a, b))
 
     def test_blank_image_and_garbage(self):
         self.assertIsNone(FigureCleaner().clean(_png(np.full((50, 50, 3), 255, np.uint8))).clean)

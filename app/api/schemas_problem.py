@@ -79,6 +79,12 @@ class ChoicesOut(_OpenOut):
     layout: str = "auto"
 
 
+class PaletteColorOut(_OpenOut):
+    hue: int                                  # 색상(0~179). 지울 색으로 고를 때 이 값을 보낸다
+    rgb: str                                  # 견본 색 #rrggbb
+    share: float = 0.0                        # 그림에서 차지하는 비율
+
+
 class FigureOut(_OpenOut):
     id: str
     kind: str = "crop"                       # crop(지금) · scene(후속)
@@ -86,6 +92,10 @@ class FigureOut(_OpenOut):
     clean_ref: str | None = None
     levels: dict[str, str | None] | None = None   # 정리 세기별 미리보기(1~4) → 이미지 ref
     clean_level: int | None = None                # 고른 세기(0 = 원본)
+    clean_color: Literal["keep", "erase", "pick"] | None = None   # 색 처리: keep = 색 유지, erase = 색 필기 지움(없으면 erase), pick = 고른 색만 지움
+    clean_hues: list[int] | None = None           # pick일 때 지운 색의 색상 값
+    pick_ref: str | None = None                   # pick일 때 고른 색을 지운 정리본(지우개로 고쳐도 남는다)
+    palette: list[PaletteColorOut] | None = None  # 그림의 주요 색 견본(없으면 색을 고를 수 없다)
     erased: bool = False                          # 낙서 지우개로 고친 그림이면 True(clean_ref가 지운 결과)
     use: Literal["raw", "clean"] = "clean"
     placement: Literal["after_stem", "after_choices"] = "after_stem"

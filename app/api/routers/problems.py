@@ -11,10 +11,11 @@ from .. import problem_service as svc
 from ..concurrency import etag, require_if_match
 from ..deps import current_user, get_now, get_session, get_settings, get_store
 from ..errors import ApiError
+from ...recognition.factory import build_cleaner
 from ..problem_logic import check_math
 from ..schemas_misc import MathCheckOut
 from ..schemas_problem import (ERR_COMMON, ERR_LOCKED, ERR_WRITE, NeighborsOut, ProblemOut, ok)
-from ..schemas_web import ContentPutIn, FigureAddIn, FigureCleanLevelIn, FigureRegionIn
+from ..schemas_web import ContentPutIn, FigureAddIn, FigureCleanLevelIn, FigureEraseColorsIn, FigureRegionIn
 from ..settings import Settings
 
 router = APIRouter()
@@ -93,11 +94,27 @@ def set_figure_region(pid: str, fid: str, body: FigureRegionIn, response: Respon
     return _with_etag(svc.set_figure_region(session, owner, pid, fid, body.bbox), response)
 
 
+def get_cleaner(request: Request, settings: Settings = Depends(get_settings)):
+    """그림 정리기(색 고르기 미리보기용). 처음 쓸 때 한 번 만들어 둔다(테스트는 app.state.cleaner를 바꿔 끼운다)."""
+    cleaner = getattr(request.app.state, "cleaner", None)
+    if cleaner is None:
+        cleaner = request.app.state.cleaner = build_cleaner(settings)
+    return cleaner
+
+
 @router.put("/problems/{pid}/figures/{fid}/clean-level", response_model=ProblemOut, responses={**ok(), **ERR_WRITE})
 def set_figure_clean_level(pid: str, fid: str, body: FigureCleanLevelIn, response: Response,
                            owner: str = Depends(current_user), session: Session = Depends(get_session),
-                           store=Depends(get_store)):
-    return _with_etag(svc.set_figure_clean_level(session, owner, pid, fid, body.level, store), response)
+                           store=Depends(get_store), cleaner=Depends(get_cleaner)):
+    return _with_etag(svc.set_figure_clean_level(session, owner, pid, fid, body.level, store, body.color, cleaner), response)
+
+
+@router.put("/problems/{pid}/figures/{fid}/erase-colors", response_model=ProblemOut, responses={**ok(), **ERR_WRITE})
+def set_figure_erase_colors(pid: str, fid: str, body: FigureEraseColorsIn, response: Response,
+                            owner: str = Depends(current_user), session: Session = Depends(get_session),
+                            store=Depends(get_store), cleaner=Depends(get_cleaner)):
+    """지울 색을 골라(palette의 hue 목록) 그 색만 지운 정리본으로 바꾼다. 다른 색은 남는다."""
+    return _with_etag(svc.set_figure_erase_colors(session, store, cleaner, owner, pid, fid, body.level, body.hues), response)
 
 
 @router.put("/problems/{pid}/figures/{fid}/erased", response_model=ProblemOut, responses={**ok(), **ERR_WRITE})
@@ -123,6 +140,13 @@ def reset_figure_erased(pid: str, fid: str, response: Response, owner: str = Dep
 def delete_figure(pid: str, fid: str, response: Response, owner: str = Depends(current_user),
                   session: Session = Depends(get_session)):
     return _with_etag(svc.delete_figure(session, owner, pid, fid), response)
+
+
+@router.delete("/problems/{pid}/removed-figures/{fid}", response_model=ProblemOut, responses={**ok(), **ERR_WRITE})
+def discard_removed_figure(pid: str, fid: str, response: Response, owner: str = Depends(current_user),
+                           session: Session = Depends(get_session), store=Depends(get_store)):
+    """지운 그림을 보관 목록에서 완전히 없앤다(되살릴 수 없음)."""
+    return _with_etag(svc.discard_removed_figure(session, store, owner, pid, fid), response)
 
 
 @router.post("/problems/{pid}/figures/{fid}/restore", response_model=ProblemOut, responses={**ok(), **ERR_WRITE})

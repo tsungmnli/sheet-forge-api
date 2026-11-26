@@ -15,7 +15,7 @@ from .storage.images import StorageError
 def _figure_refs(content) -> list:
     out = []
     for f in (content or {}).get("figures") or []:
-        out.extend(v for v in (f.get("raw_ref"), f.get("clean_ref"), *(f.get("levels") or {}).values()) if v)
+        out.extend(v for v in (f.get("raw_ref"), f.get("clean_ref"), f.get("pick_ref"), *(f.get("levels") or {}).values()) if v)
     return out
 
 

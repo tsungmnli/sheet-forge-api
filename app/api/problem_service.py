@@ -14,7 +14,7 @@ from ..db.models import Page, Problem, ReadUsage, Segment
 from ..jobs import enqueue
 from .edit_stats import count_edits
 from .errors import ApiError
-from .figure_erase import prepare_erased
+from .figure_erase import erase_base_ref, prepare_erased
 from .messages import friendly
 from .problem_logic import (MAX_FIGURES, analyze, empty_content, normalize_content, preview, preview_tex, search_text)
 from .repo import alive, soft_delete
@@ -332,23 +332,38 @@ def set_figure_region(session, owner: str, pid: str, fid: str, bbox) -> dict:
     return problem_view(session, p)
 
 
-def set_figure_clean_level(session, owner: str, pid: str, fid: str, level: int, store=None) -> dict:
-    """그림 정리 세기를 고른다(0 = 정리 안 한 원본). 이미 만들어 둔 단계 중에서 고르므로 작업은 만들지 않는다."""
+def _level_key(level: int, color: str | None) -> str:
+    """levels 안의 키: 색 유지본은 'k1'~'k4', 색 필기를 지운 본은 '1'~'4'."""
+    return f"k{level}" if color == "keep" else str(level)
+
+
+def set_figure_clean_level(session, owner: str, pid: str, fid: str, level: int, store=None, color: str | None = None,
+                           cleaner=None) -> dict:
+    """그림 정리 세기(0 = 정리 안 한 원본)와 색 처리를 고른다. keep·erase는 이미 만들어 둔 단계 중에서 고르고,
+    지울 색을 골라 둔 그림(pick)은 같은 색으로 새 세기를 그때 만든다."""
     p = _load(session, owner, pid, lock=True)
     _require_editable(p)
     fig = _figure(p, fid)
     if fig.get("state") != "ready":
         raise ApiError(409, "PROBLEM_BUSY")
-    ref = (fig.get("levels") or {}).get(str(level)) if level else None
-    if level and not ref:
-        raise ApiError(422, "REQUEST_INVALID", "그 정리 세기는 쓸 수 없어요.")
+    color = color or fig.get("clean_color") or "erase"   # 안 보내면 지금 값(옛 그림은 erase)
+    pick_ref, hues = None, None
+    if color == "pick":
+        hues = fig.get("clean_hues") or []
+        if level and (not hues or cleaner is None):
+            raise ApiError(422, "REQUEST_INVALID", "그 정리 세기는 쓸 수 없어요.")
+        ref = pick_ref = _render_pick(store, cleaner, fig, level, hues) if level else None
+    else:
+        ref = (fig.get("levels") or {}).get(_level_key(level, color)) if level else None
+        if level and not ref:
+            raise ApiError(422, "REQUEST_INVALID", "그 정리 세기는 쓸 수 없어요.")
     p.content = {**p.content, "figures": [
-        dict(f, clean_level=level, clean_ref=ref, use="clean" if ref else "raw", erased=False)
+        dict(f, clean_level=level, clean_color=color, clean_ref=ref, pick_ref=pick_ref, clean_hues=hues,
+             use="clean" if ref else "raw", erased=False)
         if f.get("id") == fid else f for f in p.content["figures"]]}
     _bump(p)
     session.commit()
-    if fig.get("erased"):   # 단계를 바꾸면 지운 결과는 버린다(웹이 먼저 확인을 받는다)
-        _drop_files(store, fig.get("clean_ref"))
+    _drop_stale(store, fig, ref, pick_ref)   # 바꾸면 지운 결과와 이전 색 고르기 결과는 버린다(웹이 먼저 확인을 받는다)
     return problem_view(session, p)
 
 
@@ -362,6 +377,54 @@ def _drop_files(store, *refs) -> None:
                 pass
 
 
+def _render_pick(store, cleaner, fig: dict, level: int, hues) -> str:
+    """원본 그림에서 hues(색상 값) 근처 색만 지운 정리본을 만들어 저장하고 ref를 돌려준다."""
+    obj = store.get(fig.get("raw_ref")) if store is not None and fig.get("raw_ref") else None
+    if obj is None or cleaner is None:
+        raise ApiError(404, "NOT_FOUND")
+    try:
+        res = cleaner.clean(obj[0], level, erase_hues=list(hues))
+    except Exception:  # noqa: BLE001 — 이미지를 못 읽는 등
+        raise ApiError(422, "REQUEST_INVALID", "이 색은 지울 수 없어요.") from None
+    if res.clean is None:
+        raise ApiError(422, "REQUEST_INVALID", "이 색은 지울 수 없어요.")
+    ref = new_id("img")
+    store.put(ref, res.clean, res.content_type or "image/png")
+    return ref
+
+
+def _drop_stale(store, fig: dict, *keep) -> None:
+    """바꾸기 전 그림(fig)이 가리키던 파일 중, 단계별 미리보기(levels)도 새 값(keep)도 아닌 것을 지운다(지운 결과, 색 고르기 결과)."""
+    live = set((fig.get("levels") or {}).values()) | set(keep)
+    _drop_files(store, *({fig.get("clean_ref"), fig.get("pick_ref")} - live - {None}))
+
+
+def set_figure_erase_colors(session, store, cleaner, owner: str, pid: str, fid: str, level: int, hues) -> dict:
+    """지울 색을 골라 그 색만 지운 정리본을 만든다(색 견본 fig.palette 안의 색만). 고른 색·세기는 그림에 기억한다."""
+    p = _load(session, owner, pid, lock=True)
+    _require_editable(p)
+    fig = _figure(p, fid)
+    if fig.get("state") != "ready":
+        raise ApiError(409, "PROBLEM_BUSY")
+    hues = sorted(set(hues))
+    allowed = {c.get("hue") for c in fig.get("palette") or []}
+    if not hues or not set(hues) <= allowed:
+        raise ApiError(422, "REQUEST_INVALID", "고를 수 없는 색이에요.")
+    new_ref = _render_pick(store, cleaner, fig, level, hues)
+    try:
+        p.content = {**p.content, "figures": [
+            dict(f, clean_level=level, clean_color="pick", clean_hues=hues, clean_ref=new_ref, pick_ref=new_ref,
+                 use="clean", erased=False) if f.get("id") == fid else f for f in p.content["figures"]]}
+        _bump(p)
+        session.commit()
+    except Exception:
+        session.rollback()
+        _drop_files(store, new_ref)
+        raise
+    _drop_stale(store, fig, new_ref)
+    return problem_view(session, p)
+
+
 def set_figure_erased(session, store, settings, owner: str, pid: str, fid: str, data: bytes) -> dict:
     """낙서 지우개로 지운 결과(PNG)를 그림의 정리본으로 저장한다. 원래 정리 단계(levels)는 그대로 남는다."""
     p = _load(session, owner, pid, lock=True)
@@ -369,7 +432,7 @@ def set_figure_erased(session, store, settings, owner: str, pid: str, fid: str, 
     fig = _figure(p, fid)
     if fig.get("state") != "ready":
         raise ApiError(409, "PROBLEM_BUSY")
-    base_ref = fig.get("clean_ref")
+    base_ref = erase_base_ref(fig)   # 정리 단계를 고르지 않은 원본 그림도 지울 수 있다
     if not base_ref:
         raise ApiError(409, "FIGURE_NOT_CLEANED")
     base = store.get(base_ref)
@@ -389,7 +452,7 @@ def set_figure_erased(session, store, settings, owner: str, pid: str, fid: str, 
         _drop_files(store, new_ref)   # 저장은 됐는데 기록이 실패하면 방금 올린 파일을 치운다
         raise
     if fig.get("erased"):
-        _drop_files(store, base_ref)  # 이전에 지운 결과는 더 쓰지 않는다
+        _drop_files(store, fig.get("clean_ref"))  # 이전에 지운 결과는 더 쓰지 않는다(바탕이 원본이어도 지운 결과는 clean_ref다)
     return problem_view(session, p)
 
 
@@ -403,7 +466,10 @@ def reset_figure_erased(session, store, owner: str, pid: str, fid: str) -> dict:
     if not fig.get("erased"):
         return problem_view(session, p)
     level = fig.get("clean_level") or 0
-    ref = (fig.get("levels") or {}).get(str(level)) if level else None
+    if fig.get("clean_color") == "pick":   # 색을 골라 지운 그림은 그 결과(pick_ref)로 돌아간다
+        ref = fig.get("pick_ref") if level else None
+    else:
+        ref = (fig.get("levels") or {}).get(_level_key(level, fig.get("clean_color"))) if level else None
     p.content = {**p.content, "figures": [
         dict(f, clean_ref=ref, use="clean" if ref else "raw", erased=False) if f.get("id") == fid else f
         for f in p.content["figures"]]}
@@ -430,6 +496,22 @@ def delete_figure(session, owner: str, pid: str, fid: str) -> dict:
     p.search_text = search_text(p.content)
     _bump(p)
     session.commit()
+    return problem_view(session, p)
+
+
+def discard_removed_figure(session, store, owner: str, pid: str, fid: str) -> dict:
+    """지운 그림 보관 목록에서 그림을 완전히 없앤다(되살릴 수 없다). 그 그림의 파일도 지운다."""
+    p = _load(session, owner, pid, lock=True)
+    _require_editable(p)
+    meta = dict(p.ocr_meta or {})
+    removed = list(meta.get("removed_figures") or [])
+    fig = next((r for r in removed if r.get("id") == fid), None)
+    if fig is None:
+        raise ApiError(404, "NOT_FOUND")
+    p.ocr_meta = {**meta, "removed_figures": [r for r in removed if r.get("id") != fid]}
+    _bump(p)
+    session.commit()
+    _drop_files(store, *{fig.get("raw_ref"), fig.get("clean_ref"), fig.get("pick_ref"), *(fig.get("levels") or {}).values()} - {None})
     return problem_view(session, p)
 
 

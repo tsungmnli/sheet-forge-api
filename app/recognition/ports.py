@@ -50,8 +50,13 @@ class Recognizer(Protocol):
 
 
 class FigureCleaner(Protocol):
-    def clean(self, raw: bytes, level: int = 2) -> CleanResult:
-        """그림 크롭 → 정리본(필기·그림자 제거). level은 정리 세기 1~4. 실패하면 예외."""
+    def clean(self, raw: bytes, level: int = 2, keep_color: bool = False, erase_hues=None) -> CleanResult:
+        """그림 크롭 → 정리본(필기·그림자 제거). level은 정리 세기 1~4. keep_color면 색 필기를 지우지 않는다.
+        erase_hues(색상 값 목록)를 주면 그 색만 지운다. 실패하면 예외."""
+        ...
+
+    def palette(self, raw: bytes) -> list:
+        """그림의 주요 색 견본 [{hue, rgb, share}]. 지울 색을 고르는 데 쓴다. 실패하면 예외."""
         ...
 
 

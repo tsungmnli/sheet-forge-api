@@ -26,7 +26,8 @@ def get_image(ref: str, request: Request, owner: str = Depends(current_user),
             or_(Problem.crop_ref == ref,
                 Problem.content["figures"].contains([{"raw_ref": ref}]),
                 Problem.content["figures"].contains([{"clean_ref": ref}]),
-                *[Problem.content["figures"].contains([{"levels": {str(k): ref}}]) for k in (1, 2, 3, 4)])).limit(1)).first()
+                Problem.content["figures"].contains([{"pick_ref": ref}]),
+                *[Problem.content["figures"].contains([{"levels": {str(k): ref}}]) for k in (1, 2, 3, 4, "k1", "k2", "k3", "k4")])).limit(1)).first()
     if owned is None:
         raise ApiError(404, "NOT_FOUND")
     tag = f'"{ref}"'

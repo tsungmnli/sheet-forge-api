@@ -5,7 +5,7 @@ import pytest
 from PIL import Image
 
 from app.api.errors import ApiError
-from app.api.figure_erase import prepare_erased
+from app.api.figure_erase import erase_base_ref, prepare_erased
 
 
 def _png(size, mode="L", color=255):
@@ -39,6 +39,16 @@ def test_rejects(data, status, code):
     with pytest.raises(ApiError) as e:
         prepare_erased(data, BASE, LIMIT)
     assert (e.value.status, e.value.code) == (status, code)
+
+
+@pytest.mark.parametrize("fig,ref", [
+    ({"use": "clean", "clean_ref": "c", "raw_ref": "r"}, "c"),   # 정리본이 있으면 정리본 위에서
+    ({"use": "clean", "clean_ref": None, "raw_ref": "r"}, "r"),  # 정리 단계를 안 고른 그림은 원본 위에서
+    ({"use": "raw", "clean_ref": "c", "raw_ref": "r"}, "r"),     # 원본을 쓰는 그림은 보이는 그대로 원본 위에서
+    ({"use": "clean", "clean_ref": None, "raw_ref": None}, None),
+])
+def test_erase_base_ref(fig, ref):
+    assert erase_base_ref(fig) == ref
 
 
 def test_too_large():

@@ -27,6 +27,13 @@ MAX_REGION_REDO = 3         # 정리 중 그림 범위가 바뀌어 다시 하�
 
 CLEAN_LEVELS = (1, 2, 3, 4)   # 그림 정리 세기. 모두 미리 만들어 두고 사용자가 고른다(0 = 원본)
 DEFAULT_CLEAN_LEVEL = 2
+# 색 처리: erase = 색 필기를 지움(예전 방식), keep = 색을 두고 밝기로만 정리. 정리본은 두 방식을 모두 만들어 두고,
+# 색 유지본의 키는 'k1'~'k4'다(levels 안에 함께 둔다). 새 그림의 처음 값은 DEFAULT_CLEAN_COLOR.
+DEFAULT_CLEAN_COLOR = "keep"   # 기본은 색 유지: 인쇄된 색 그림이 낙서로 오해돼 지워지는 것보다 낙서가 남는 편이 안전하다(지우개로 지운다)
+
+
+def level_key(level: int, color: str) -> str:
+    return f"k{level}" if color == "keep" else str(level)
 FIGURE_WIDTH_MM = 60.0      # 읽기에서 만든 그림의 기본 폭(add_figure 기본값과 같다)
 
 
@@ -131,21 +138,31 @@ def handle_figure_clean(db, store, cleaner, job) -> None:
             f0 = _find_figure(p, fid)
             pid, crop_ref, bbox = p.id, p.crop_ref, list(f0["bbox"])
             prev_level = f0.get("clean_level")
+            # 이미 정리해 본 그림은 그때 고른 색 처리를 이어 가고(옛 그림은 erase), 처음이면 기본값을 쓴다
+            prev_color = (f0.get("clean_color") or "erase") if prev_level is not None else DEFAULT_CLEAN_COLOR
+            if prev_color == "pick":   # 범위가 바뀌면 색 견본도 달라지므로 고른 색은 풀고 색 유지로 돌아간다
+                prev_color = "keep"
         obj = store.get(crop_ref)
         if obj is None:
             raise StorageError("MISSING_CROP")
         raw, _, _ = imaging.crop_region(obj[0], bbox, 0.0, "PNG")
         raw_ref, levels = new_id("img"), {}
         store.put(raw_ref, raw, "image/png")
-        for lv in CLEAN_LEVELS:
-            try:
-                res = cleaner.clean(raw, lv)
-                if res.clean is not None:
-                    ref = new_id("img")
-                    store.put(ref, res.clean, res.content_type or "image/png")
-                    levels[str(lv)] = ref
-            except Exception as exc:  # noqa: BLE001 — 정리 실패는 치명적이지 않다(원본 사용)
-                log.warning("그림 정리 실패 figure=%s level=%s %s", fid, lv, type(exc).__name__)
+        try:
+            palette = cleaner.palette(raw)   # 지울 색을 고르는 색 견본
+        except Exception as exc:  # noqa: BLE001 — 색 견본은 없어도 된다
+            log.warning("그림 색 견본 실패 figure=%s %s", fid, type(exc).__name__)
+            palette = []
+        for color in ("erase", "keep"):
+            for lv in CLEAN_LEVELS:
+                try:
+                    res = cleaner.clean(raw, lv, keep_color=(color == "keep"))
+                    if res.clean is not None:
+                        ref = new_id("img")
+                        store.put(ref, res.clean, res.content_type or "image/png")
+                        levels[level_key(lv, color)] = ref
+                except Exception as exc:  # noqa: BLE001 — 정리 실패는 치명적이지 않다(원본 사용)
+                    log.warning("그림 정리 실패 figure=%s level=%s color=%s %s", fid, lv, color, type(exc).__name__)
         with db.session() as s:
             p = s.execute(select(Problem).where(Problem.id == pid).with_for_update()).scalar_one_or_none()
             fig = _find_figure(p, fid) if p is not None and p.deleted_at is None else None
@@ -155,13 +172,15 @@ def handle_figure_clean(db, store, cleaner, job) -> None:
             if list(fig["bbox"]) != bbox:   # 정리하는 사이 범위가 바뀜 → 새 범위로 다시
                 _drop(store, raw_ref, *levels.values())
                 continue
-            old = {fig.get("raw_ref"), fig.get("clean_ref"), *(fig.get("levels") or {}).values()}
+            old = {fig.get("raw_ref"), fig.get("clean_ref"), fig.get("pick_ref"), *(fig.get("levels") or {}).values()}
             # 사용자가 고른 단계를 이어 간다(범위를 고쳐 다시 정리해도 같은 세기). 없는 단계면 원본(0)
             want = prev_level if prev_level in (0, *CLEAN_LEVELS) else DEFAULT_CLEAN_LEVEL
-            level = want if want == 0 or str(want) in levels else 0
-            clean_ref = levels.get(str(level))
+            level = want if want == 0 or level_key(want, prev_color) in levels else 0
+            clean_ref = levels.get(level_key(level, prev_color)) if level else None
             p.content = {**p.content, "figures": [
-                dict(f, raw_ref=raw_ref, clean_ref=clean_ref, levels=levels, clean_level=level, state="ready", erased=False,
+                dict(f, raw_ref=raw_ref, clean_ref=clean_ref, levels=levels, clean_level=level, clean_color=prev_color,
+                     palette=palette, pick_ref=None, clean_hues=None,
+                     state="ready", erased=False,
                      use="clean" if clean_ref else "raw")
                 if f.get("id") == fid else f for f in p.content["figures"]]}
             _bump(p)
