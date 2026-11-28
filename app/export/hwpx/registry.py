@@ -14,6 +14,7 @@ class ParaKey(NamedTuple):
     keep_with_next: bool
     keep_lines: bool
     tab_pr_id: int = 0    # M3 이전에는 템플릿의 기본 tabPr 0
+    line_spacing: int = 0  # 0이면 문서 기본 줄 간격, 아니면 이 값(%)으로 고정(머리말처럼 본문 설정과 무관해야 하는 곳)
 
 
 class TabKey(NamedTuple):
@@ -23,6 +24,7 @@ class TabKey(NamedTuple):
 
 _TAB_ID_RE = re.compile(r'<hh:tabPr id="(\d+)"')
 _BORDER_ID_RE = re.compile(r'<hh:borderFill id="(\d+)"')
+_CHAR_ID_RE = re.compile(r'<hh:charPr id="(\d+)"')
 _PARA0_RE = re.compile(r'<hh:paraPr id="0" .*?</hh:paraPr>', re.S)
 _PARA_ID_RE = re.compile(r'<hh:paraPr id="(\d+)"')
 
@@ -79,23 +81,70 @@ class StyleRegistry:
         if not bids:
             raise TemplateError("header.xml에 borderFill이 없음")
         self._first_border_id = max(bids) + 1
-        self._border_id = None
+        self._border_ids: dict = {}   # 종류(table·title·slash·none) → borderFill id. 처음 쓴 순서대로 id를 준다
+        cids = [int(x) for x in _CHAR_ID_RE.findall(header_xml)]
+        if not cids:
+            raise TemplateError("header.xml에 charPr가 없음")
+        self._first_char_id = max(cids) + 1
+        self._char_ids: dict = {}   # (글자 높이 HWPUNIT, 글꼴 이름 또는 None=본문 글꼴) → charPr id
+
+    def _border(self, kind: str) -> int:
+        if kind not in self._border_ids:
+            self._border_ids[kind] = self._first_border_id + len(self._border_ids)
+        return self._border_ids[kind]
 
     def table_border(self) -> int:
         """표 네 면 실선(0.12mm) borderFill. 템플릿에는 없으므로 처음 쓸 때 새로 추가한다(샘플 시험지.hwpx의 id 3과 같은 모양)."""
-        if self._border_id is None:
-            self._border_id = self._first_border_id
-        return self._border_id
+        return self._border("table")
+
+    def title_border(self) -> int:
+        """제목 표 칸 테두리: 아래쪽만 0.5mm 실선(sample.hwpx의 borderFill 6과 같은 모양)."""
+        return self._border("title")
+
+    def slash_border(self) -> int:
+        """쪽 번호 상자 칸 테두리: 네 면 실선(0.12mm) + 대각선 `/`(sample.hwpx의 borderFill 7과 같은 모양)."""
+        return self._border("slash")
+
+    def plain_border(self) -> int:
+        """테두리·채움 없음(sample.hwpx의 borderFill 5). 쪽 번호 상자를 담는 바깥 표에 쓴다."""
+        return self._border("none")
+
+    def char(self, height: int, font: "str | None" = None) -> int:
+        """본문(charPr 0)을 복사해 크기(와 글꼴)만 바꾼 글자 모양. font가 None이면 본문 글꼴.
+        처음 쓸 때 새로 추가한다(header_patch가 만든다)."""
+        key = (height, font)
+        if key not in self._char_ids:
+            self._char_ids[key] = self._first_char_id + len(self._char_ids)
+        return self._char_ids[key]
+
+    @property
+    def new_chars(self) -> list:
+        return [(cid, h, f) for (h, f), cid in self._char_ids.items()]
 
     @property
     def new_border_xml(self) -> list:
-        if self._border_id is None:
-            return []
-        side = 'type="SOLID" width="0.12 mm" color="#000000"'
-        return [f'<hh:borderFill id="{self._border_id}" threeD="0" shadow="0" centerLine="NONE" breakCellSeparateLine="0">'
-                '<hh:slash type="NONE" Crooked="0" isCounter="0"/><hh:backSlash type="NONE" Crooked="0" isCounter="0"/>'
-                f'<hh:leftBorder {side}/><hh:rightBorder {side}/><hh:topBorder {side}/><hh:bottomBorder {side}/>'
-                '<hh:diagonal type="SOLID" width="0.1 mm" color="#000000"/></hh:borderFill>']
+        out = []   # id 순서대로
+        head = 'threeD="0" shadow="0" centerLine="NONE" breakCellSeparateLine="0"'
+        lines = '<hh:slash type="NONE" Crooked="0" isCounter="0"/><hh:backSlash type="NONE" Crooked="0" isCounter="0"/>'
+        slash = '<hh:slash type="CENTER" Crooked="0" isCounter="0"/><hh:backSlash type="NONE" Crooked="0" isCounter="0"/>'
+        diag = '<hh:diagonal type="SOLID" width="0.1 mm" color="#000000"/>'
+        solid = 'type="SOLID" width="0.12 mm" color="#000000"'
+        none = 'type="NONE" width="0.1 mm" color="#000000"'
+        for kind, bid in self._border_ids.items():
+            if kind == "table":
+                body = (f'{lines}<hh:leftBorder {solid}/><hh:rightBorder {solid}/><hh:topBorder {solid}/>'
+                        f'<hh:bottomBorder {solid}/>{diag}')
+            elif kind == "title":
+                body = (f'{lines}<hh:leftBorder {none}/><hh:rightBorder {none}/><hh:topBorder {none}/>'
+                        f'<hh:bottomBorder type="SOLID" width="0.5 mm" color="#000000"/>{diag}')
+            elif kind == "slash":   # [sample.hwpx borderFill 7] 대각선도 0.12mm 실선
+                body = (f'{slash}<hh:leftBorder {solid}/><hh:rightBorder {solid}/><hh:topBorder {solid}/>'
+                        f'<hh:bottomBorder {solid}/><hh:diagonal type="SOLID" width="0.12 mm" color="#000000"/>')
+            else:   # none
+                body = (f'{lines}<hh:leftBorder {none}/><hh:rightBorder {none}/><hh:topBorder {none}/>'
+                        f'<hh:bottomBorder {none}/>{diag}')
+            out.append((bid, f'<hh:borderFill id="{bid}" {head}>{body}</hh:borderFill>'))
+        return [x for _, x in sorted(out)]
 
     def tab(self, line_w: int, n_cols: int) -> int:
         """열 균등 분할 탭 정지: 위치 = round(줄 폭 × k ÷ n), k = 1…n-1 [검증 t12c, 설계 9장 4]."""
@@ -116,7 +165,7 @@ class StyleRegistry:
         if key not in self._ids:
             pid = self._first_id + len(self._ids)
             self._ids[key] = pid
-            self._xml.append(make_para_pr(self._base, pid, key, self._line_spacing))
+            self._xml.append(make_para_pr(self._base, pid, key, key.line_spacing or self._line_spacing))
         return self._ids[key]
 
     @property

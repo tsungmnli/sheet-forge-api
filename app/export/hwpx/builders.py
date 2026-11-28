@@ -48,6 +48,23 @@ class BoxPart:
 
 
 @dataclass
+class TitlePart:
+    """첫 쪽 제목 표: 1칸 표 안에 제목 문단과 부제 문단(부제는 비어 있을 수 있음). para_pr·border_id는 내보낼 때 정한다."""
+    title: str
+    subtitle: str
+    width: int
+    height: int
+    title_size: int = 0   # 제목 줄 글자 크기(HWPUNIT). 부제가 없으면 제목이 큰 줄이 된다
+    sub_size: int = 0
+    para_pr: int = 0
+    border_id: int = 0
+    title_char: int = 0   # 글자 모양 id: 내보낼 때 정한다
+    sub_char: int = 0
+    title_font: str = ""   # 비어 있으면 본문 글꼴
+    sub_font: str = ""
+
+
+@dataclass
 class TablePart:
     """표. rows는 행마다 셀(str | Equation 목록)의 목록. col_w·row_h는 HWPUNIT. cell_pr·border_id는 내보낼 때 정한다."""
     rows: list
@@ -305,6 +322,35 @@ def _box_spec(block: dict, bi: int, pid, report: ExportReport, layout):
     report.add("BOX_HEIGHT_ESTIMATED", "info",
                f"상자 높이({geom.height})는 줄 수로 추정한 값 — 한글에서 글이 넘치거나 남으면 상자 크기를 조절하세요", pid, path)
     return ParagraphSpec([BoxPart(bg.display_title(title), lines, geom)], role="box", problem_id=pid)
+
+
+TITLE_SMALL = 2000   # 제목 표 첫 줄 20pt [sample.hwpx charPr 7]
+TITLE_BIG = 3200     # 큰 줄 32pt [sample.hwpx charPr 9]
+TITLE_PAD = 430      # 제목 표 높이 여유(칸 안 글은 세로 가운데라 위아래로 나뉜다) [sample.hwpx: 9032 - 8320 - 282]
+
+
+def title_box_spec(title: str, subtitle: str, layout, big_font: str = "", small_font: str = "") -> "ParagraphSpec | None":
+    """첫 쪽 제목 상자 [sample.hwpx 기준]: 본문 폭 전체의 1칸 표 하나(제목·부제를 가운데 정렬로).
+    이 문단은 1단 구역에 두고, 그 뒤 첫 본문 문단에서 단 설정을 나눈다(section.render_section). 제목이 비면 None."""
+    title = clean_text(title or "").strip()
+    sub = clean_text(subtitle or "").strip()
+    if not title:
+        return None
+    font = layout.font_hwp if layout else 1000
+    pct = layout.line_spacing_pct if layout else 160
+    width = int(layout.body_w if layout else bg.DEFAULT_COL_W)
+    text_w = width - 2 * bg.CELL_MARGIN_X
+    # [sample.hwpx] 첫 줄 20pt, 둘째(큰) 줄 32pt. 빈 줄은 두지 않는다: 마지막 줄 아래의 줄간격(160%)이 이미 아래 선과의 간격이다.
+    # 부제가 없으면 제목만 큰 줄(32pt). 표 높이 = 줄 높이(줄간격 포함) 합 + 칸 위아래 여백 + 여유
+    # (샘플: 3200 + 5120 + 282 + 430 = 9032)
+    t_size, s_size = (TITLE_SMALL, TITLE_BIG) if sub else (TITLE_BIG, 0)
+    sized = [(title, t_size)] + ([(sub, s_size)] if sub else [])
+    height = sum(bg.line_rows(bg.text_em(t), 0, text_w, z) * round(z * pct / 100) for t, z in sized)
+    height += 2 * bg.CELL_MARGIN_Y + TITLE_PAD
+    # 글꼴: 큰 줄(부제, 없으면 제목)은 big_font, 작은 줄(제목)은 small_font. 비우면 본문 글꼴(높이 추정에는 영향 없음)
+    t_font, s_font = (small_font, big_font) if sub else (big_font, "")
+    return ParagraphSpec([TitlePart(title, sub, width, height, t_size, s_size, title_font=t_font, sub_font=s_font)],
+                         role="title_box")
 
 
 # ---------------------------------------------------------------- 표 [샘플 시험지.hwpx 기준]

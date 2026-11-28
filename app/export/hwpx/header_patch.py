@@ -51,6 +51,26 @@ def patch_header(header_xml: str, layout: LayoutContext, font_name: str, registr
     if n != 1:
         raise TemplateError("charPr 0의 fontRef를 찾지 못함")
     xml = xml[:m.start()] + c + xml[m.end():]
+    # 2-1) 크기만 다른 글자 모양 추가(제목 표): 고친 charPr 0을 복사해 id·크기만 바꾼다 + itemCnt 갱신
+    chars = registry.new_chars
+    if chars:
+        cm = re.search(r'<hh:charProperties itemCnt="(\d+)">', xml)
+        if not cm or "</hh:charProperties>" not in xml:
+            raise TemplateError("charProperties를 찾지 못함")
+        parts = []
+        for cid, h, face in sorted(chars, key=lambda x: x[0]):
+            cc = re.sub(r'<hh:charPr id="0" height="\d+"', f'<hh:charPr id="{cid}" height="{h}"', c, count=1)
+            if face:   # 본문과 다른 글꼴: 7개 언어 칸 모두에 넣고 글꼴 참조를 바꾼다
+                ids = {}
+                for lang in _FONT_LANGS:
+                    xml, ids[lang] = _ensure_font(xml, lang, face)
+                refs2 = " ".join(f'{lang.lower()}="{ids[lang]}"' for lang in _FONT_LANGS)
+                cc = re.sub(r'<hh:fontRef [^>]*/>', f'<hh:fontRef {refs2}/>', cc, count=1)
+            parts.append(cc)
+        added = "".join(parts)
+        cm = re.search(r'<hh:charProperties itemCnt="(\d+)">', xml)   # 글꼴을 넣으면 xml이 바뀌므로 다시 찾는다
+        xml = xml.replace(cm.group(0), f'<hh:charProperties itemCnt="{int(cm.group(1)) + len(chars)}">', 1)
+        xml = xml.replace("</hh:charProperties>", added + "</hh:charProperties>", 1)
     # 3) paraPr 추가 + itemCnt 갱신 [검증 4.5]
     new = registry.new_para_xml
     if new:

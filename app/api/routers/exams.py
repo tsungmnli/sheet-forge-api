@@ -26,7 +26,8 @@ router = APIRouter()
 def create_exam(response: Response, body: ExamCreateIn | None = None, owner: str = Depends(current_user),
                 session: Session = Depends(get_session)):
     body = body or ExamCreateIn()
-    exam = Exam(id=new_id("exam"), owner_id=owner, title=body.title, student=body.student, memo=body.memo)
+    exam = Exam(id=new_id("exam"), owner_id=owner, title=body.title, student=body.student, memo=body.memo,
+                source_label=body.source_label)
     session.add(exam)
     session.commit()
     out = svc.get_exam_view(session, owner, exam.id)

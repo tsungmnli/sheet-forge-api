@@ -17,6 +17,7 @@ class WorksheetCreateIn(BaseModel):
 class WorksheetPatchIn(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True)
     title: str | None = Field(None, max_length=200)
+    subtitle: str | None = Field(None, max_length=200)
     student: str | None = Field(None, max_length=100)
     preset: PresetValue | None = None
     preset_id: str | None = Field(None, max_length=60)
@@ -48,6 +49,7 @@ class WsItemOut(BaseModel):
 class WorksheetOut(BaseModel):
     id: str
     title: str
+    subtitle: str = ""
     student: str
     version: int
     items: list[WsItemOut]

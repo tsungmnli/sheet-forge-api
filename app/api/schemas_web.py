@@ -12,6 +12,7 @@ class ExamCreateIn(BaseModel):
     title: str = Field("", max_length=200)
     student: str = Field("", max_length=100)
     memo: str = Field("", max_length=2000)
+    source_label: str = Field("", max_length=100)
 
 
 class ExamPatchIn(BaseModel):
@@ -19,6 +20,7 @@ class ExamPatchIn(BaseModel):
     title: str | None = Field(None, max_length=200)
     student: str | None = Field(None, max_length=100)
     memo: str | None = Field(None, max_length=2000)
+    source_label: str | None = Field(None, max_length=100)
 
 
 class PageOrderIn(BaseModel):
@@ -36,6 +38,7 @@ class ExamOut(BaseModel):
     title: str
     student: str
     memo: str
+    source_label: str = ""
     version: int
     created_at: str
     updated_at: str

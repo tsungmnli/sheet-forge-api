@@ -18,6 +18,12 @@ log = logging.getLogger("sheet_forge.api")
 HWPX_MEDIA = "application/vnd.hancom.hwpx"
 
 PAPERS = [{"kind": "A4", "width_mm": 210, "height_mm": 297}, {"kind": "B5", "width_mm": 182, "height_mm": 257}]
+# 여백 한 번에 채우기. 샘플형은 참고 시험지(중1 기말대비)의 여백이다
+MARGIN_PRESETS = [
+    {"key": "default", "label": "기본", "margins_mm": ExportPreset().to_dict()["margins_mm"]},
+    {"key": "sample", "label": "샘플형", "margins_mm": {"top": 5.0, "header": 20.0, "bottom": 10.0, "footer": 15.0,
+                                                       "left": 15.0, "right": 15.0, "gutter": 0.0}},
+]
 
 
 @router.post("/exports")
@@ -50,4 +56,4 @@ def layout_preview(body: LayoutPreviewBody):
 
 @router.get("/export-presets/defaults")
 def preset_defaults():
-    return {"preset": ExportPreset().to_dict(), "papers": PAPERS}
+    return {"preset": ExportPreset().to_dict(), "papers": PAPERS, "margin_presets": MARGIN_PRESETS}

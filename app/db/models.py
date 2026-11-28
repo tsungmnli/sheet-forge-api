@@ -13,6 +13,8 @@ class Exam(CommonColumns, Base):
     title: Mapped[str] = mapped_column(String(200), nullable=False, default="", server_default="")
     student: Mapped[str] = mapped_column(String(100), nullable=False, default="", server_default="")
     memo: Mapped[str] = mapped_column(Text, nullable=False, default="", server_default="")
+    # 출처: 내보낼 때 "[대안중 2025기말]"처럼 찍는 인쇄용 이름(관리용 제목과 별개). 비면 찍지 않는다
+    source_label: Mapped[str] = mapped_column(String(100), nullable=False, default="", server_default="")
     __table_args__ = (Index("ix_exams_owner_updated", "owner_id", "updated_at"),)
 
 
@@ -94,6 +96,7 @@ class Worksheet(CommonColumns, Base):
     """문제지(REST 5.7). 파일은 저장하지 않고 last_export만 기록한다."""
     __tablename__ = "worksheets"
     title: Mapped[str] = mapped_column(String(200), nullable=False, default="", server_default="")
+    subtitle: Mapped[str] = mapped_column(String(200), nullable=False, default="", server_default="")   # 첫 쪽 제목 상자의 부제
     student: Mapped[str] = mapped_column(String(100), nullable=False, default="", server_default="")
     preset: Mapped[dict] = mapped_column(JSONB, nullable=False)    # 선택한 시점의 값 복사(REST 5.8)
     unconfirmed_policy: Mapped[str] = mapped_column(String(8), nullable=False, default="skip", server_default="skip")

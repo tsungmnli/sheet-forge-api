@@ -57,6 +57,7 @@ REPORT_MESSAGES = {
     "EQ_AUTO_BROKEN": "긴 수식이라 줄을 나눠 넣었어요.",
     "EQ_TOO_WIDE": "수식이 한 줄에 다 안 들어갈 수 있어요. 한글에서 줄을 나눠 주세요.",
     "TEXT_FORMAT_IGNORED": "굵게·밑줄은 아직 반영하지 않았어요.",
+    "TITLE_BOX_NO_TITLE": "제목이 비어 있어서 첫 쪽 제목 상자는 넣지 않았어요.",
     "CHOICES_NEAR_LIMIT": "선택지가 한 줄에 빠듯해요. 한글에서 줄이 갈라지면 직접 고쳐 주세요.",
     "FIGURE_MISSING": "그림을 불러오지 못해 이 문제를 빼고 만들었어요.",
     "FIGURE_SHRUNK": "그림이 칸보다 커서 칸에 맞춰 줄였어요.",
@@ -65,8 +66,13 @@ REPORT_MESSAGES = {
     "NOT_IMPLEMENTED": "아직 지원하지 않는 부분이 있어 기본 방식으로 처리했어요.",
 }
 
+# 라이브러리가 처음부터 쉬운 문장으로 쓰는 코드. 값(몇 mm에서 몇 mm로)이 들어 있어 문장 표로 바꾸지 않고 그대로 보낸다
+REPORT_PASSTHROUGH = {"HEADER_MARK_TALL", "FOOTER_TALL"}
 
-def report_message(code: str) -> str:
+
+def report_message(code: str, message: str | None = None) -> str:
+    if code in REPORT_PASSTHROUGH and message:
+        return message
     return REPORT_MESSAGES.get(code, REPORT_GENERIC)
 
 

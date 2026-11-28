@@ -99,6 +99,15 @@ def check_worksheet(session, owner: str, wid: str) -> dict:
             add("SOURCE_NUMBER_DUPLICATE", "warn",
                 f"원래 번호가 겹치는 문제가 {len(repeated)}개 있어요. 파일에도 같은 번호로 들어가요.",
                 problem_ids=repeated)
+    if ((ws.preset or {}).get("source") or {}).get("mode") in ("exam", "problem") and exportable:
+        exam_ids = {p.exam_id for p in exportable}
+        labels = dict(session.execute(select(Exam.id, Exam.source_label).where(Exam.id.in_(exam_ids))).all())
+        no_label = [p.id for p in exportable if not (labels.get(p.exam_id) or "").strip()]
+        if no_label:
+            n_exams = len({p.exam_id for p in exportable if p.id in set(no_label)})
+            add("SOURCE_LABEL_MISSING", "warn",
+                f"출처를 적지 않은 시험지가 {n_exams}개 있어요. 그 시험지의 문제에는 출처가 찍히지 않아요.",
+                problem_ids=no_label)
     for p in exportable:
         if figure_missing(p.content):
             add("FIGURE_MISSING", "warn", "그림이 없는 문제가 있어요", problem_id=p.id)

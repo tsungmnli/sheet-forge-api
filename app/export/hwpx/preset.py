@@ -52,7 +52,45 @@ class Numbering:
 
 @dataclass
 class PageNumber:
-    enabled: bool = False   # 쪽 아래 가운데에 "- 1 -" 모양으로 넣음
+    enabled: bool = False   # 쪽 아래 가운데에 넣음
+    # dash: "- 3 -" | total: "3 / 19"(전체 쪽수는 한글이 자동으로 셈) | box: 상자 안 "3 / 19"
+    style: str = "dash"
+
+
+PAGE_NUMBER_STYLES = ("dash", "total", "box")
+
+
+@dataclass
+class Source:
+    # none: 찍지 않음 | exam: 시험지가 바뀌는 곳마다 한 줄 | problem: 문항마다 번호 줄 끝에
+    # 출처 글자는 시험지(Exam.source_label)에서 오고, 비어 있으면 그 문항은 찍지 않는다
+    mode: str = "none"
+
+
+SOURCE_MODES = ("none", "exam", "problem")
+
+
+@dataclass
+class HeaderMark:
+    # 둘째 쪽부터 머리말에 넣는 짧은 글자(예: "중1")를 상자에 담는다. 글자가 비어 있으면 넣지 않는다.
+    # 첫 쪽 제목 상자(title_box)가 들어간 쪽에서는 숨기고, 제목 상자가 없으면 첫 쪽에도 넣는다.
+    # position: left | right | outside(양면 인쇄용: 홀수 쪽은 오른쪽, 짝수 쪽은 왼쪽)
+    text: str = ""
+    position: str = "right"
+
+
+HEADER_MARK_POSITIONS = ("left", "right", "outside")
+HEADER_MARK_MAX_LEN = 20
+
+
+@dataclass
+class TitleBox:
+    # 첫 쪽 맨 위에 제목(문제지 제목)과 부제를 담은 상자를 넣는다. 제목이 비어 있으면 켜져 있어도 넣지 않는다.
+    # 기본은 꺼짐: 이미 만든 문제지·내보내기 결과가 바뀌지 않게 한다
+    enabled: bool = False
+    # 글꼴 [sample.hwpx]. 크기는 큰 줄 32pt·작은 줄 20pt로 고정. 큰 줄은 부제(없으면 제목), 작은 줄은 제목
+    big_font: str = "HY헤드라인M"
+    small_font: str = "HY견명조"
 
 
 @dataclass
@@ -90,6 +128,9 @@ class ExportPreset:
     figures: Figures = field(default_factory=Figures)
     equation: Equation = field(default_factory=Equation)
     page_number: PageNumber = field(default_factory=PageNumber)
+    source: Source = field(default_factory=Source)
+    title_box: TitleBox = field(default_factory=TitleBox)
+    header_mark: HeaderMark = field(default_factory=HeaderMark)
     on_unconfirmed: str = "skip"  # skip | fail
 
     @classmethod
@@ -152,6 +193,11 @@ def column_gap_hwp(p: ExportPreset) -> int:
     return mm_to_hwp(p.columns.gap_mm)
 
 
+def _font_ok(name) -> bool:
+    """글꼴 이름: 글자이고 비어 있지 않으며 제어 문자가 없고 100자 이하."""
+    return isinstance(name, str) and bool(name.strip()) and len(name) <= 100 and not any(ord(ch) < 32 for ch in name)
+
+
 def _num(x) -> bool:
     return isinstance(x, (int, float)) and not isinstance(x, bool)
 
@@ -193,10 +239,24 @@ def validate_preset(p: ExportPreset) -> list:
         err("PRESET_COLUMNS", "단 구분선은 true 또는 false")
     if not isinstance(p.page_number.enabled, bool):
         err("PRESET_PAGE_NUMBER", "쪽 번호는 true 또는 false")
+    if p.page_number.style not in PAGE_NUMBER_STYLES:
+        err("PRESET_PAGE_NUMBER", "쪽 번호 양식은 dash/total/box")
+    if p.source.mode not in SOURCE_MODES:
+        err("PRESET_SOURCE", "출처 표기는 none/exam/problem")
+    if not isinstance(p.title_box.enabled, bool):
+        err("PRESET_TITLE_BOX", "제목 상자는 true 또는 false")
+
+    hm = p.header_mark
+    if not isinstance(hm.text, str) or len(hm.text.strip()) > HEADER_MARK_MAX_LEN or any(ord(ch) < 32 for ch in hm.text):
+        err("PRESET_HEADER_MARK", f"머리 표식 글자는 {HEADER_MARK_MAX_LEN}자 이하의 한 줄이어야 함")
+    if hm.position not in HEADER_MARK_POSITIONS:
+        err("PRESET_HEADER_MARK", "머리 표식 위치는 left/right/outside")
 
     t = p.typography
-    if not (isinstance(t.font_name, str) and t.font_name.strip()) or any(ord(ch) < 32 for ch in str(t.font_name)):
+    if not _font_ok(t.font_name):
         err("PRESET_FONT", "글꼴 이름이 비어 있거나 잘못됨")
+    if not _font_ok(p.title_box.big_font) or not _font_ok(p.title_box.small_font):
+        err("PRESET_TITLE_FONT", "제목 글꼴 이름이 비어 있거나 잘못됨")
     if not (_num(t.font_size_pt) and 6 <= t.font_size_pt <= 20):  # [제안]
         err("PRESET_FONT_SIZE", "글자 크기는 6~20pt")
     if not (_num(t.equation_size_pt) and 6 <= t.equation_size_pt <= 20):  # [제안]

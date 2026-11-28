@@ -33,7 +33,8 @@ def next_action(page_count: int, picked_count: int, unread_count: int, needs_rev
 
 def exam_out(exam, page_count, picked, active) -> dict:
     page_count, picked = int(page_count), int(picked)
-    return {"id": exam.id, "title": exam.title, "student": exam.student, "memo": exam.memo, "version": exam.version,
+    return {"id": exam.id, "title": exam.title, "student": exam.student, "memo": exam.memo,
+            "source_label": exam.source_label, "version": exam.version,
             "created_at": iso(exam.created_at), "updated_at": iso(exam.updated_at),
             "page_count": page_count, "picked_count": picked,
             "needs_review": 0, "confirmed": 0,  # 문제(Problem)는 B2에서 생긴다

@@ -12,6 +12,7 @@ from sqlalchemy import delete, func, select, tuple_, update
 from ..db.ids import new_id
 from ..db.models import Exam, Page, Problem, Segment, Worksheet, WorksheetItem
 from ..export.hwpx import ExportPreset, PresetError, plan_layout
+from ..export.hwpx.preview import page_preview
 from .errors import ApiError
 from .me_service import default_preset_value
 from .pagination import decode_cursor, encode_cursor
@@ -106,10 +107,13 @@ def worksheet_view(session, ws: Worksheet) -> dict:
               "crop_url": image_url(p.crop_ref), "source_number": snum}
              for (p, eid, etitle, snum), num in zip(rows, numbers)]
     try:
-        layout = plan_layout(ExportPreset.from_dict(ws.preset)).summary()
+        preset = ExportPreset.from_dict(ws.preset)
+        lay = plan_layout(preset)
+        # 배치 미리보기 값은 제목·부제에 따라 달라지므로(제목 상자 높이) 문제지마다 여기서 붙인다
+        layout = {**lay.summary(), **page_preview(preset, lay, ws.title or "", ws.subtitle or "")}
     except PresetError:
         layout = None
-    return {"id": ws.id, "title": ws.title, "student": ws.student, "version": ws.version, "items": items,
+    return {"id": ws.id, "title": ws.title, "subtitle": ws.subtitle, "student": ws.student, "version": ws.version, "items": items,
             "preset": ws.preset, "preset_id": None,
             "unconfirmed_policy": ws.unconfirmed_policy, "layout": layout, "last_export": ws.last_export,
             "updated_at": iso(ws.updated_at)}
@@ -169,6 +173,8 @@ def patch_worksheet(session, owner: str, wid: str, version: int, body) -> None:
     values = {}
     if body.title is not None:
         values["title"] = body.title
+    if body.subtitle is not None:
+        values["subtitle"] = body.subtitle
     if body.student is not None:
         values["student"] = body.student
     if body.unconfirmed_policy is not None:
@@ -196,7 +202,7 @@ def delete_worksheet(session, owner: str, wid: str) -> None:
 def duplicate_worksheet(session, owner: str, wid: str) -> str:
     src = _load(session, owner, wid)
     title = f"{src.title} 복사본"[:200] if src.title else ""
-    ws = Worksheet(id=new_id("ws"), owner_id=owner, title=title, student=src.student,
+    ws = Worksheet(id=new_id("ws"), owner_id=owner, title=title, subtitle=src.subtitle, student=src.student,
                    preset=copy.deepcopy(src.preset),
                    unconfirmed_policy=src.unconfirmed_policy)
     ids = _current_ids(session, wid)

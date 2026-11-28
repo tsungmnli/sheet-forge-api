@@ -27,7 +27,7 @@ def run_worksheet_export(ro_session, store, owner: str, wid: str, settings: Sett
     preset = ExportPreset.from_dict(ws.preset)       # 잘못된 값이면 PresetError → 422
     preset.on_unconfirmed = ws.unconfirmed_policy    # 문제지 설정이 우선
     images = StoreImages(store, settings.max_image_bytes, settings.max_image_px)
-    result = export_hwpx(ExportRequest(problems, preset, ExportMeta(ws.title, now), images))
+    result = export_hwpx(ExportRequest(problems, preset, ExportMeta(ws.title, now, ws.subtitle), images))
     links = {p["id"]: p["exam_id"] for p in problems}   # 리포트 link용
     return safe_filename(ws.title), result, links
 
@@ -45,7 +45,7 @@ def web_report(report: dict, links: dict) -> dict:
     """웹으로 나가는 리포트: link를 붙이고, 개발자용 message를 쉬운 문장으로 바꾸고, summary를 넣는다(설계 3.1·5.7)."""
     add_links(report, links)
     for item in report["items"]:
-        item["message"] = report_message(item["code"])
+        item["message"] = report_message(item["code"], item.get("message"))
     report["summary"] = report_summary(report["items"])
     return report
 
