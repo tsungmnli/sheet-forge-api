@@ -140,7 +140,9 @@ def export_hwpx(req: ExportRequest) -> ExportResult:
     title_on = False
     title_fonts: list = []   # 제목 표에 실제로 쓰인 글꼴(안내용)
     if preset.title_box.enabled:   # 첫 쪽 맨 위: 본문 폭 전체의 제목 표(1단 구역). 이어서 단 설정을 나눈다
-        tb = title_box_spec(req.meta.title, req.meta.subtitle, layout, preset.title_box.big_font, preset.title_box.small_font)
+        box = preset.title_box
+        tb = title_box_spec(req.meta.title, req.meta.subtitle, layout, box.big_font, box.small_font,
+                            round(box.big_pt * 100), round(box.small_pt * 100))
         if tb is None:
             report.add("TITLE_BOX_NO_TITLE", "warn", "제목이 비어 있어 제목 상자를 넣지 않음")
         else:

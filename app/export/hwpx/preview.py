@@ -14,10 +14,18 @@ def _mm(v: int) -> float:
 def page_preview(preset: ExportPreset, layout: LayoutContext, title: str, subtitle: str) -> dict:
     """layout.summary()에 덧붙일 값. 제목이 비면 제목 상자를 넣지 않으므로 title_box_h_mm은 None이다."""
     mark = clean_text(preset.header_mark.text).strip()
-    tb = title_box_spec(title, subtitle, layout) if preset.title_box.enabled else None
+    box = preset.title_box
+    tb = (title_box_spec(title, subtitle, layout, big_size=round(box.big_pt * 100),
+                         small_size=round(box.small_pt * 100)) if box.enabled else None)
+    wraps = None
+    if tb:   # 화면의 첫 줄·둘째 줄 기준. 부제가 없으면 제목이 둘째 줄이고 첫 줄은 없다
+        part = tb.parts[0]
+        wraps = ({"first": part.title_wraps, "second": part.sub_wraps} if part.subtitle
+                 else {"first": False, "second": part.title_wraps})
     return {
         "col_gap_mm": _mm(layout.col_gap),
         "title_box_h_mm": _mm(tb.parts[0].height) if tb else None,
+        "title_box_wraps": wraps,
         # 머리말 맨 위에서 표식 상자 윗변까지(top_mm), 표 아래 선까지(line_mm)
         "header_mark": {"w_mm": _mm(header_mark_width(mark, layout.body_w)), "h_mm": _mm(HEADER_MARK_H),
                         "top_mm": _mm(header_mark_top()),

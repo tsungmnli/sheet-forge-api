@@ -81,6 +81,7 @@ class HeaderMark:
 
 HEADER_MARK_POSITIONS = ("left", "right", "outside")
 HEADER_MARK_MAX_LEN = 20
+TITLE_PT_MIN, TITLE_PT_MAX = 8, 48   # 제목 상자 글자 크기(pt) [제안]. 웹 types.ts와 같게 둔다
 
 
 @dataclass
@@ -88,9 +89,12 @@ class TitleBox:
     # 첫 쪽 맨 위에 제목(문제지 제목)과 부제를 담은 상자를 넣는다. 제목이 비어 있으면 켜져 있어도 넣지 않는다.
     # 기본은 꺼짐: 이미 만든 문제지·내보내기 결과가 바뀌지 않게 한다
     enabled: bool = False
-    # 글꼴 [sample.hwpx]. 크기는 큰 줄 32pt·작은 줄 20pt로 고정. 큰 줄은 부제(없으면 제목), 작은 줄은 제목
+    # 글꼴·크기 [sample.hwpx]. big_*는 둘째 줄(부제, 없으면 제목), small_*는 첫 줄(부제가 있을 때의 제목).
+    # 크기가 저장돼 있지 않은 옛 모양은 지금까지와 같은 32pt·20pt가 된다
     big_font: str = "HY헤드라인M"
     small_font: str = "HY견명조"
+    big_pt: float = 32
+    small_pt: float = 20
 
 
 @dataclass
@@ -257,6 +261,8 @@ def validate_preset(p: ExportPreset) -> list:
         err("PRESET_FONT", "글꼴 이름이 비어 있거나 잘못됨")
     if not _font_ok(p.title_box.big_font) or not _font_ok(p.title_box.small_font):
         err("PRESET_TITLE_FONT", "제목 글꼴 이름이 비어 있거나 잘못됨")
+    if not all(_num(v) and TITLE_PT_MIN <= v <= TITLE_PT_MAX for v in (p.title_box.big_pt, p.title_box.small_pt)):
+        err("PRESET_TITLE_SIZE", f"제목 글자 크기는 {TITLE_PT_MIN}~{TITLE_PT_MAX}pt")
     if not (_num(t.font_size_pt) and 6 <= t.font_size_pt <= 20):  # [제안]
         err("PRESET_FONT_SIZE", "글자 크기는 6~20pt")
     if not (_num(t.equation_size_pt) and 6 <= t.equation_size_pt <= 20):  # [제안]
